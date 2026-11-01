@@ -4094,3 +4094,54 @@ auf den Fix-Commit gesetzt; der Lauf startet neu. Kein Release ging mit dem Fehl
   will.
 
 Damit ist die 0.5-Linie draußen: letzter veröffentlichter Stand vorher v0.4.13.
+
+## 98. Vormerkungen (2026-10-31, auf Wunsch des Nutzers, nicht bearbeitet)
+
+Zwei Wünsche für später, wörtlich aufgenommen. Ich habe nur nachgesehen, wie es heute im Code
+aussieht — nichts geändert.
+
+### a) „Datei anzeigen" öffnet keinen Baum, sondern springt in den Tab
+
+Beobachtung des Nutzers: Wenn er über den Knopf in der Titel-Toolbar eine **weitere** Datei
+öffnen will, geht nicht der Datei-Baum auf, sondern die Ansicht springt nur zum Tab.
+
+So ist es heute:
+
+- Der Knopf ruft `openTab("file")` (`src/components/ToolbarActions.vue`) →
+  `src/stores/workArea.ts:92`. Alle Dateien teilen sich **einen** Tab mit der festen Id `"file"`;
+  existiert er, wird nur `activeTabId` gesetzt, sonst nichts.
+- `openFile(path)` (Zeile 103) legt den neuen Pfad auf denselben Tab (`existing.filePath = path`)
+  — es gibt bewusst keine Tableiste pro Datei.
+- Der Baum lebt **im** Tab (`ViewFileTab.vue`, `.tree-pane`, umschaltbar über den Knopf in der
+  Tab-Leiste).
+
+Ein Wunsch wäre also: Klick auf „Datei anzeigen" zeigt den **Baum** (bzw. öffnet ihn, wenn er
+ausgeblendet ist) statt nur den zuletzt gelesenen Inhalt zu aktivieren — damit man von dort die
+nächste Datei wählt. Zu entscheiden dabei: soll der Baum-Status pro Tab gemerkt werden, und
+soll der Knopf bei geschlossenem Tab Baum + Datei zeigen?
+
+### b) Mehrere Projekte/Workspaces verwalten
+
+Wunsch: das Arbeitsverzeichnis im linken Menü mitführen, mehrere Projekte nebeneinander haben
+und die Zuordnung sehen (Vorbild: DeepVibe — „Projekte → Ordner → Threads"). Ausdrücklich
+**keine 1:1-Kopie** von DeepVibe; es geht um die Funktion, nicht um die Optik.
+
+So ist es heute:
+
+- `sessions` hat eine Spalte `workspace` (`src-tauri/src/db.rs:14`) und `session_create`
+  schreibt sie (`useEngine.ts:505` mit `settings.workspace`).
+- **Beim Öffnen einer Session wird sie aber nicht zurückgesetzt.** `openSession` fasst
+  `settings.workspace` nicht an; es gilt überall das eine globale Arbeitsverzeichnis. Der
+  gespeicherte Wert ist damit nur eine Notiz, kein Zustand.
+- Die linke Leiste gruppiert nach `group` (`pinned`, `scheduled`, `project`, `team` —
+  `LeftRail.vue:130`), **nicht** nach Workspace. „Projekt" ist eine flache Liste von Sessions.
+
+Der kleinste sinnvolle erste Schritt wäre, die vorhandene Spalte zu benutzen: Beim Wechsel
+einer Session deren `workspace` setzen (und die Datei-Baum-/Editor-Ansicht mitziehen). Alles
+Weitere — Liste bekannter Workspaces, Anlegen/Entfernen, Sessions ohne Workspace, Suche über
+mehrere Projekte — ist danach eine eigene Runde mit einer Spec.
+
+### Nicht Teil dieser Notiz
+- Die 1.0.8-Sammelliste des Nutzers für die **Vibes** (Hanzi-Reste, falsche Bezeichnungen).
+  Angebot steht: `scripts/check-i18n.mjs` dorthin portieren, erweitert um eine CJK-Prüfung für
+  Nicht-`zh`-Kataloge.
