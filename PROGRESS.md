@@ -4095,53 +4095,85 @@ auf den Fix-Commit gesetzt; der Lauf startet neu. Kein Release ging mit dem Fehl
 
 Damit ist die 0.5-Linie draußen: letzter veröffentlichter Stand vorher v0.4.13.
 
-## 98. Vormerkungen (2026-10-31, auf Wunsch des Nutzers, nicht bearbeitet)
+## 98. Projekte im linken Menü (überarbeitet 2026-11-02, noch nicht gebaut)
 
-Zwei Wünsche für später, wörtlich aufgenommen. Ich habe nur nachgesehen, wie es heute im Code
-aussieht — nichts geändert.
+Ursprünglich zwei Vormerkungen vom 31.10. Der Nutzer hat beide korrigiert; der erste Punkt
+war kein Fehler, der zweite ist jetzt konkret beschrieben.
 
-### a) „Datei anzeigen" öffnet keinen Baum, sondern springt in den Tab
+### a) Dateibaum — erledigt, kein Fehler
+Der Nutzer hatte den Knopf nur nicht gefunden. Der Datei-Tab hat in seiner festen Kopfzeile
+neben dem Pfad einen Knopf „Dateibaum einblenden" (`ViewFileTab.vue`, `fileTreeVisible`).
 
-Beobachtung des Nutzers: Wenn er über den Knopf in der Titel-Toolbar eine **weitere** Datei
-öffnen will, geht nicht der Datei-Baum auf, sondern die Ansicht springt nur zum Tab.
+Was bleibt: **mehrere Dateien gleichzeitig gehen nicht**, und das ist Absicht. Alle Dateien
+teilen sich einen Tab (`openFile` ersetzt den Pfad). `openTab` könnte längst Tabs pro Pfad
+(`file:<path>`) — der Zweig wird von niemandem aufgerufen. Nach Einschätzung des Nutzers nicht
+nötig („soll ja dem Nachlesen dienen"). Falls doch: zwei Zeilen.
 
-So ist es heute:
+### b) Projekte und Threads — der neue Entwurf des Nutzers
 
-- Der Knopf ruft `openTab("file")` (`src/components/ToolbarActions.vue`) →
-  `src/stores/workArea.ts:92`. Alle Dateien teilen sich **einen** Tab mit der festen Id `"file"`;
-  existiert er, wird nur `activeTabId` gesetzt, sonst nichts.
-- `openFile(path)` (Zeile 103) legt den neuen Pfad auf denselben Tab (`existing.filePath = path`)
-  — es gibt bewusst keine Tableiste pro Datei.
-- Der Baum lebt **im** Tab (`ViewFileTab.vue`, `.tree-pane`, umschaltbar über den Knopf in der
-  Tab-Leiste).
+**Wunsch:** In den Einstellungen steht ein **Oberverzeichnis** (Beispiel: `~/Projects`). Im
+linken Menü, dort wo heute „+ Neue Aufgabe" sitzt, steht ein **Dropdown mit den
+Unterverzeichnissen** dieses Oberverzeichnisses und dahinter ein „+". Klick auf „+" legt einen
+Thread an, der an das gewählte Unterverzeichnis **gebunden** ist; unter „Projekte" erscheinen
+die Projekte mit ihren Threads.
 
-Ein Wunsch wäre also: Klick auf „Datei anzeigen" zeigt den **Baum** (bzw. öffnet ihn, wenn er
-ausgeblendet ist) statt nur den zuletzt gelesenen Inhalt zu aktivieren — damit man von dort die
-nächste Datei wählt. Zu entscheiden dabei: soll der Baum-Status pro Tab gemerkt werden, und
-soll der Knopf bei geschlossenem Tab Baum + Datei zeigen?
+**Was schon da ist (nachgesehen):**
+- `sessions` hat die Spalte `workspace`, `session_create` schreibt beim Anlegen
+  `settings.workspace` hinein, und `Session` (Frontend) trägt das Feld. **Die Verknüpfung
+  existiert also bereits** — sie wird nur nie benutzt. Keine Migration für neue Threads nötig.
+- Die Archiv-Seite gruppiert schon nach Workspace (`projectLabel`, `archivedProjects`,
+  Projektfilter in `SettingsPage.vue`) — das Muster ist im Haus.
+- `openSession` setzt den Workspace **nicht**; es gilt überall das eine globale
+  `settings.workspace` (31 Stellen im Frontend).
 
-### b) Mehrere Projekte/Workspaces verwalten
+**Die entscheidende Trennung.** `settings.workspace` ist heute *das* Verzeichnis, in dem
+Werkzeuge lesen und schreiben (`workspaceOnly`, Engine-Config, Dateibaum, Git-Panel,
+Terminal-cwd, Preview-Server, Editor-Öffnen). Es darf **nicht** das Oberverzeichnis werden:
+Dann liefen Schreibzugriffe über alle Projekte, der Baum zeigte alles gemischt, und das
+Git-Panel stünde auf `~/Projects` (das hier selbst ein Repository ist). Also:
 
-Wunsch: das Arbeitsverzeichnis im linken Menü mitführen, mehrere Projekte nebeneinander haben
-und die Zuordnung sehen (Vorbild: DeepVibe — „Projekte → Ordner → Threads"). Ausdrücklich
-**keine 1:1-Kopie** von DeepVibe; es geht um die Funktion, nicht um die Optik.
+- **neu:** `projectsRoot` — das Oberverzeichnis, nur zum Auflisten der Unterordner.
+- **bleibt:** `settings.workspace` — das aktive Projekt, gesetzt aus der Session.
+- In den Einstellungen heißt das Feld dann „Projektbasis"; das aktive Projekt wird daneben
+  angezeigt (abgeleitet, nicht getippt).
 
-So ist es heute:
+**Vorgeschlagene Bedienung (eine Bedeutung, nicht zwei).** Das Dropdown zeigt das *aktive*
+Projekt — nicht „wohin der nächste Thread geht". Sonst driften zwei Zustände auseinander:
+- Auswahl im Dropdown = Projekt wechseln (Baum, Git, Engine ziehen mit).
+- Klick auf einen Thread = dessen Projekt wird aktiv.
+- „+" = neuer Thread im gerade aktiven Projekt.
+- „Ohne Projekt" als letzter Eintrag, damit „Neue Aufgabe" ohne Bindung weiter möglich ist.
 
-- `sessions` hat eine Spalte `workspace` (`src-tauri/src/db.rs:14`) und `session_create`
-  schreibt sie (`useEngine.ts:505` mit `settings.workspace`).
-- **Beim Öffnen einer Session wird sie aber nicht zurückgesetzt.** `openSession` fasst
-  `settings.workspace` nicht an; es gilt überall das eine globale Arbeitsverzeichnis. Der
-  gespeicherte Wert ist damit nur eine Notiz, kein Zustand.
-- Die linke Leiste gruppiert nach `group` (`pinned`, `scheduled`, `project`, `team` —
-  `LeftRail.vue:130`), **nicht** nach Workspace. „Projekt" ist eine flache Liste von Sessions.
+**Was beim Wechsel mitziehen muss (aus dem Code):**
+| Teil | heute | nötig |
+| --- | --- | --- |
+| Dateibaum | `reloadTree()` beim Wechsel über die Einstellungen | gleicher Aufruf beim Session-/Projektwechsel |
+| Git-Panel | lädt nur `onMounted`, kein `watch` | `watch(workspace)` → `refresh()` |
+| Terminal | `cwd` beim Start aus `settings.workspace`, folgt nie | **Entscheidung** (siehe unten) |
+| Preview | startet bei geändertem Workspace neu | passt schon |
+| Engine/Rechte | `configureEngine` schickt `workspace` | passt, wenn das Projekt gesetzt ist |
+| Entwürfe | pro Session gespeichert | passt |
 
-Der kleinste sinnvolle erste Schritt wäre, die vorhandene Spalte zu benutzen: Beim Wechsel
-einer Session deren `workspace` setzen (und die Datei-Baum-/Editor-Ansicht mitziehen). Alles
-Weitere — Liste bekannter Workspaces, Anlegen/Entfernen, Sessions ohne Workspace, Suche über
-mehrere Projekte — ist danach eine eigene Runde mit einer Spec.
+**Leiste:** Die Sektion „Projekte" bekommt pro Workspace einen Ordner-Kopf
+(`projectLabel`) mit ihren Threads darunter; Threads ohne Workspace landen unter „Ohne
+Projekt". Angeheftete/geplante Threads bleiben in ihren eigenen Sektionen. Zeigt ein Thread
+auf einen Ordner, den es nicht mehr gibt, bleibt die Gruppe sichtbar und wird als fehlend
+markiert — nicht stillschweigend verschwinden.
 
-### Nicht Teil dieser Notiz
-- Die 1.0.8-Sammelliste des Nutzers für die **Vibes** (Hanzi-Reste, falsche Bezeichnungen).
-  Angebot steht: `scripts/check-i18n.mjs` dorthin portieren, erweitert um eine CJK-Prüfung für
-  Nicht-`zh`-Kataloge.
+**Kein Raten beim Umstieg:** Existiert `projectsRoot` noch nicht, verhält sich die Leiste wie
+heute („+ Neue Aufgabe"). Das Oberverzeichnis wird nicht aus dem aktuellen Workspace
+abgeleitet — das wäre eine stille Annahme. Ältere Threads ohne `workspace` erscheinen unter
+„Ohne Projekt" und lassen sich nachtragen.
+
+**Offene Entscheidungen (vor dem Bauen):**
+1. **Terminal beim Projektwechsel:** weiterlaufen lassen mit sichtbarem alten `cwd`, oder
+   beenden und im neuen Projekt neu starten? (Empfehlung: weiterlaufen, Pfad im Kopf zeigen —
+   ein laufender Prozess ist Zustand, den man nicht wegwirft.)
+2. **Projektwechsel bei offenem, ungesendetem Entwurf:** Entwürfe hängen an der Session, nicht
+   am Projekt — ein Wechsel ist damit unkritisch. Nur bestätigen.
+3. **Unterordner, die keine Projekte sind** (`.git`, `node_modules`, Ordner ohne Dateien):
+   ausblenden oder alles zeigen? (Empfehlung: alles zeigen, nichts raten.)
+
+**Nicht Teil dieser Notiz:** Die 1.0.8-Sammelliste des Nutzers für die **Vibes**
+(Hanzi-Reste, falsche Bezeichnungen). Angebot steht: `scripts/check-i18n.mjs` dorthin
+portieren, erweitert um eine CJK-Prüfung für Nicht-`zh`-Kataloge.
