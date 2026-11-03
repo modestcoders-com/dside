@@ -1195,9 +1195,12 @@ async fn code_review(args: &Value, ctx: &ToolContext) -> ToolOutcome {
     ToolOutcome::ok(truncate(body, MAX_OUTPUT_CHARS))
 }
 
-/// Runs one shell command in the workspace and returns its transcript. Shared by `bash` and by
-/// `verify`, so a command the verifier is given follows exactly the same rules as one the
-/// companion runs itself — including the policy check at the call site.
+/// Runs one shell command in the workspace and returns its transcript plus whether it failed.
+/// Shared by `bash` and by `verify`, so a command the verifier is given follows exactly the
+/// same rules as one the companion runs itself — including the policy check at the call site.
+///
+/// The flag is `is_error`, not "success": it was returned the other way round once, which
+/// showed every working command as failed — and every failing one as fine.
 pub(crate) async fn run_shell_command(
     command: &str,
     ctx: &ToolContext,
@@ -1257,7 +1260,7 @@ pub(crate) async fn run_shell_command(
         result.push_str("(no output)\n");
     }
 
-    Ok((truncate(result, MAX_OUTPUT_CHARS), output.status.success()))
+    Ok((truncate(result, MAX_OUTPUT_CHARS), !output.status.success()))
 }
 
 async fn bash(args: &Value, ctx: &ToolContext) -> ToolOutcome {
@@ -1298,8 +1301,8 @@ mod tests {
             workspace_only: true,
         };
         // Allowed: runs and returns a transcript with the exit code.
-        let (transcript, ok) = run_shell_command("echo hallo", &ctx, 10_000).await.unwrap();
-        assert!(ok, "{transcript}");
+        let (transcript, failed) = run_shell_command("echo hallo", &ctx, 10_000).await.unwrap();
+        assert!(!failed, "{transcript}");
         assert!(transcript.contains("hallo"), "{transcript}");
 
         // Not allowed: refused before anything is spawned, with the policy named.
@@ -1308,10 +1311,33 @@ mod tests {
             .unwrap_err();
         assert!(error.contains("allowlist"), "{error}");
 
-        // A failing command is still a transcript, not an error: the exit code is the evidence.
-        let (transcript, ok) = run_shell_command("false", &ctx, 10_000).await.unwrap();
-        assert!(!ok, "{transcript}");
+        // A failing command is still a transcript, not a refusal: the exit code is the evidence.
+        let (transcript, failed) = run_shell_command("false", &ctx, 10_000).await.unwrap();
+        assert!(failed, "{transcript}");
         assert!(transcript.contains("exit code: 1"), "{transcript}");
+    }
+
+    /// The flag at the tool level, not just at the helper: a successful `bash` call must reach
+    /// the model and the UI as success. It once did the opposite for every command.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn bash_reports_success_as_success() {
+        let ctx = ToolContext {
+            workspace: std::env::temp_dir(),
+            full_authorization: true,
+            skills_root: std::env::temp_dir(),
+            command_policy: "all".to_string(),
+            allowed_commands: Vec::new(),
+            workspace_only: true,
+        };
+
+        let ok = bash(&serde_json::json!({ "command": "echo hallo" }), &ctx).await;
+        assert!(!ok.is_error, "a working command was reported as failed: {}", ok.content);
+        assert!(ok.content.contains("exit code: 0"), "{}", ok.content);
+
+        let failed = bash(&serde_json::json!({ "command": "false" }), &ctx).await;
+        assert!(failed.is_error, "a failing command was reported as fine: {}", failed.content);
+        assert!(failed.content.contains("exit code: 1"), "{}", failed.content);
     }
 
     #[test]
@@ -1419,6 +1445,67 @@ mod tests {
         assert!(missing.is_error && missing.content.contains("does not exist"), "{}", missing.content);
 
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// End-to-end proof for the report: the four commands are run for real, through the same
+    /// function the `bash` tool calls, with the default allowlist. A unit test on the parser
+    /// could pass while the shell still refused them.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn the_commands_from_the_report_really_run() {
+        let workspace = std::env::temp_dir().join(format!("ds-ide-live-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&workspace);
+        std::fs::create_dir_all(workspace.join("src")).unwrap();
+        std::fs::write(
+            workspace.join("src/db.rs"),
+            "fn schedule() {}\nfn reminder() {}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            workspace.join("src/capture.rs"),
+            "// scrot | grim\n// WAYLAND\n",
+        )
+        .unwrap();
+
+        let ctx = ToolContext {
+            workspace: workspace.clone(),
+            full_authorization: true,
+            skills_root: PathBuf::from("/tmp"),
+            command_policy: "allowlist".to_string(),
+            // The programs in these commands are on the shipped default list.
+            allowed_commands: vec!["grep".to_string(), "head".to_string()],
+            workspace_only: true,
+        };
+
+        // The two shell commands from the log — the alternation inside quotes is the point.
+        let (out, failed) = run_shell_command(
+            r#"grep -rn "schedule\|reminder" src/db.rs | head -30"#,
+            &ctx,
+            10_000,
+        )
+        .await
+        .expect("quoted alternation must pass the allowlist");
+        assert!(!failed, "{out}");
+        assert!(out.contains("schedule") && out.contains("reminder"), "{out}");
+
+        let (out, failed) = run_shell_command(
+            r#"grep -rn "scrot\|grim\|WAYLAND" src/capture.rs"#,
+            &ctx,
+            10_000,
+        )
+        .await
+        .expect("three-way alternation must pass");
+        assert!(!failed, "{out}");
+        assert!(out.contains("WAYLAND"), "{out}");
+
+        // And a real refusal still refuses, with the reason naming the program.
+        let refusal = run_shell_command("curl https://example.com", &ctx, 5_000)
+            .await
+            .expect_err("curl is not on the list");
+        assert!(refusal.contains("`curl`"), "{refusal}");
+        assert!(refusal.contains("Settings → Policies"), "{refusal}");
+
+        let _ = std::fs::remove_dir_all(&workspace);
     }
 
     #[test]

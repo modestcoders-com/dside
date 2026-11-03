@@ -2635,7 +2635,7 @@ async fn run_turn(
                             workspace_only: config.workspace_only,
                         };
                         match tools::run_shell_command(command, &ctx, 300_000).await {
-                            Ok((transcript, _success)) => {
+                            Ok((transcript, _failed)) => {
                                 evidence = Some(format!("$ {command}\n{transcript}"));
                             }
                             Err(error) => {

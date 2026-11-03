@@ -4413,3 +4413,48 @@ sind getrennte Schalter, und die alte Meldung nannte nur „policies".
 Die Allowlist-Tests enthalten die Befehle aus dem Nutzer-Log wörtlich.
 Ein Live-Aufruf des Werkzeugs war nicht möglich (dafür bräuchte es einen Modellaufruf); die
 Tests laufen aber durch dieselbe Funktion, die der Werkzeugpfad aufruft.
+
+## 104. Live-Prüfung — und ein gefundener Fehler: jeder `bash`-Erfolg sah wie ein Fehler aus (2026-11-03)
+
+Der letzte Punkt der Runde war die ehrliche Lücke aus §103: Die Allowlist war nur per Test
+geprüft, ein echter Werkzeugaufruf war nicht möglich. Dafür jetzt ein Test, der die Befehle aus
+dem Nutzer-Log **wirklich ausführt** — durch `run_shell_command`, dieselbe Funktion, die `bash`
+aufruft, mit der echten Shell und der Standardliste:
+
+- `grep -rn "schedule\|reminder" src/db.rs | head -30` → Treffer, kein Fehler.
+- `grep -rn "scrot\|grim\|WAYLAND" src/capture.rs` → Treffer.
+- `curl https://example.com` → abgelehnt, Meldung nennt `` `curl` `` und „Settings → Policies".
+Test: `the_commands_from_the_report_really_run`.
+
+### Der Fehler, der dabei auffiel
+`run_shell_command` gab als zweiten Wert `output.status.success()` zurück, und `bash` nannte
+ihn `is_error`. Damit galt:
+
+| Befehl | exit code | `is_error` | Anzeige/Modell |
+| --- | --- | --- | --- |
+| `pnpm build` erfolgreich | 0 | **true** | „fehlgeschlagen" |
+| `cargo test` fehlgeschlagen | 1 | **false** | „erfolgreich" |
+
+Folgen: Jeder erfolgreiche Shell-Befehl ging als Fehler an das Modell und in die Oberfläche,
+jede Fehlschlag als Erfolg. In der Datenbank (`tool_calls.is_error`) stand es verkehrt.
+`successful_tools` zählte nur die nicht-Shell-Erfolge plus die Shell-Fehlschläge — und daran
+hängt die Vertrauensvergabe (`award_trust` „finished a turn that did something").
+`verify` ignorierte den Wert bewusst (`_failed`), dort zählte nur das Transcript mit dem
+Exit-Code, deshalb fiel es dort nicht auf.
+
+Das erklärt einen Teil der „fehlgeschlagen"-Häufung, die der Nutzer beobachtet hat: Erfolgreiche
+Befehle wurden als Fehler gezeigt, und das Modell hat entsprechend darauf reagiert (wiederholt,
+ausgewichen, um Entschuldigung gebeten).
+
+**Änderung:** `run_shell_command` liefert `!output.status.success()`; der Kommentar an der
+Funktion sagt jetzt ausdrücklich, dass der Wert `is_error` heißt. Tests:
+`bash_reports_success_as_success` (Werkzeugebene, nicht nur der Helfer) und der bestehende
+Verifier-Test prüfen beide Richtungen.
+
+### Geprüft
+`cargo test --lib` **81 bestanden** / 14 ignoriert, `cargo build` ohne Warnung, `pnpm build`
+grün (506 Schlüssel).
+
+Nicht in dieser Runde: Der Nutzer bemerkte am Rande, dass ein **Export** eines Verlaufs nur die
+Werkzeugnamen zeigt, nicht ihre Ausgaben. DS.IDE hat überhaupt keinen Verlaufs-Export; die
+Beobachtung betrifft also das Werkzeug, mit dem er schreibt — notiert, nicht gebaut.
