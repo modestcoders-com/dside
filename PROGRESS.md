@@ -4353,3 +4353,63 @@ Beim Umbau ist mir ein Fehler unterlaufen, den ich notiere, weil er lehrreich is
 Diagnose. Aufgefallen im `git diff`, korrigiert durch Zurücksetzen der sechs Kataloge und
 gezieltes Ändern **innerhalb** des `general`-Blocks per Zeilenbereich — nicht per Suchtext
 über die ganze Datei.
+
+## 102. Der offene Terminal-Punkt aus §99 ist zu (2026-11-03)
+
+**Der Fehler:** Nach einem Fenster-Reload (F5 in der Entwicklung) zeigte das Terminal „Prozess
+beendet", obwohl die neue Shell lief.
+
+**Ursache:** Der Reader-Thread einer Shell meldet ihr Ende über `pty-exit { id }`. Beim Reload
+öffnet das neu eingehängte Bauteil mit **derselben** Id eine neue Shell; der Thread der alten
+meldet sich danach mit ebendieser Id, und das neue Bauteil glaubt, die eigene Shell sei tot.
+
+**Änderung:** `PtyState` hält je Terminal-Id einen `Arc<AtomicU64>`-Zähler, den der Reader-
+Thread mitbekommt. `pty_open` zählt hoch; der Thread sendet `pty-exit` nur, wenn der Zähler
+noch seine Generation trägt. Die Einträge werden bewusst **nie** entfernt: ein frischer Zähler
+nach `pty_close` würde einen veralteten Thread wieder „aktuell" machen — das steht als
+Kommentar im Code, damit es niemand wegräumt.
+Test: `a_reopened_terminal_gets_a_new_generation`.
+
+## 103. Warum `grep` und `bash` bei Pfadabfragen scheiterten (2026-11-03)
+
+Zwei getrennte Fehler, beide aus dem Log des Nutzers.
+
+### a) Das `grep`-Werkzeug verlangte ein Verzeichnis
+`{"path": ".../tools.rs", "pattern": "..."}` → *„grep: path … is not a directory"*.
+`grep` lief über `require_search_root`, das einen Ordner erzwingt — für `glob` sinnvoll, für
+`grep` nicht: eine einzelne Datei ist der natürlichste Aufruf überhaupt.
+
+**Änderung:** `grep` nimmt Datei **oder** Verzeichnis. Bei einer Datei wird nur sie gelesen
+(`grep_file`), `include` gilt dann nicht mehr; fehlt der Pfad, kommt weiter eine Meldung mit
+dem Pfad. Das Absuchen des Verzeichnisbaums nutzt jetzt dieselbe Funktion.
+Schema-Text: „File or directory to search". Test: `grep_searches_a_single_file`.
+
+### b) Die Allowlist zerlegte Befehle **innerhalb** von Anführungszeichen
+`grep -rn "schedule\|reminder" src/db.rs | head -30` → *„this command is not in the
+companion's allowlist"*, obwohl `grep` und `head` beide auf der Liste stehen.
+
+Die Prüfung ersetzte `|`, `;`, `&&` per `String::replace` durch Zeilenumbrüche — **ohne** auf
+Anführungszeichen zu achten. Aus dem Muster `"schedule\|reminder"` wurden damit zwei
+„Befehle": `grep -rn "schedule\` und `reminder" src/db.rs`. Das zweite „Programm" hieß
+`reminder"` und war natürlich nicht auf der Liste. Dasselbe bei `"name": "schedule"\|...` →
+Programm `name":`. Deshalb ging `grep` mal und mal nicht: ohne `|` im Muster funktionierte es.
+
+**Änderung:** `split_commands` ist ein echter Scanner — er kennt einfache und doppelte
+Anführungszeichen, Backslash-Escapes und trennt `|`, `||`, `;`, `&&` nur **außerhalb** von
+Anführungszeichen. Backticks, `$(`, Umleitungen und unbalancierte Anführungszeichen bleiben
+abgelehnt; ein `|` zwischen Befehlen trennt weiterhin. Tests:
+`a_pipe_inside_a_pattern_is_not_a_command_separator` (mit den Originalbefehlen aus dem Log).
+
+**Und die Meldung sagt jetzt, warum.** `check_command` liefert den Grund und das Programm:
+*„refused by the command allowlist, not by the permission level: `curl` is not in the command
+allowlist. Full access decides whether a command may run without asking; the allowlist decides
+which programs exist for the companion at all. The list is in Settings → Policies; the tools
+`grep` and `glob` need no shell and are unaffected."* — Die Verwechslung von **Berechtigung**
+(Vollzugriff) und **Richtlinie** (Allowlist) war die eigentliche Ursache der Frustration: Beides
+sind getrennte Schalter, und die alte Meldung nannte nur „policies".
+
+### Geprüft
+`cargo test --lib` **79 bestanden** / 14 ignoriert, `cargo build` ohne Warnung.
+Die Allowlist-Tests enthalten die Befehle aus dem Nutzer-Log wörtlich.
+Ein Live-Aufruf des Werkzeugs war nicht möglich (dafür bräuchte es einen Modellaufruf); die
+Tests laufen aber durch dieselbe Funktion, die der Werkzeugpfad aufruft.

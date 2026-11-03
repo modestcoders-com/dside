@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
@@ -12,6 +13,29 @@ use tauri::{AppHandle, Emitter, State};
 #[derive(Default)]
 pub struct PtyState {
     sessions: Mutex<HashMap<String, Session>>,
+    /// One counter per terminal id, shared with that shell's reader thread. Reopening the tab
+    /// replaces the process; without this the old thread's exit event arrived afterwards and
+    /// the new, running shell was shown as "process ended".
+    ///
+    /// Entries are deliberately never removed: a stale thread compares against the very
+    /// counter it was handed, so a fresh counter after `pty_close` would make it current again.
+    generations: Mutex<HashMap<String, Arc<AtomicU64>>>,
+}
+
+impl PtyState {
+    /// Counts up for `id` and hands back the new generation.
+    fn next_generation(&self, id: &str) -> Result<(Arc<AtomicU64>, u64), String> {
+        let mut generations = self
+            .generations
+            .lock()
+            .map_err(|_| "terminal: state poisoned".to_string())?;
+        let counter = generations
+            .entry(id.to_string())
+            .or_insert_with(|| Arc::new(AtomicU64::new(0)))
+            .clone();
+        let generation = counter.fetch_add(1, Ordering::SeqCst) + 1;
+        Ok((counter, generation))
+    }
 }
 
 struct Session {
@@ -31,6 +55,7 @@ struct PtyOutput {
 #[serde(rename_all = "camelCase")]
 struct PtyExit {
     id: String,
+    generation: u64,
 }
 
 fn shell() -> CommandBuilder {
@@ -102,6 +127,9 @@ pub fn pty_open(
         .map_err(|error| format!("terminal: {error}"))?;
     let master = pair.master;
 
+    // The reader of the shell we are replacing must not report its death as ours.
+    let (counter, generation) = state.next_generation(&id)?;
+
     let thread_id = id.clone();
     let thread_app = app.clone();
     std::thread::spawn(move || {
@@ -122,7 +150,16 @@ pub fn pty_open(
                 Err(_) => break,
             }
         }
-        let _ = thread_app.emit("pty-exit", PtyExit { id: thread_id });
+        // Only the current shell may say it ended.
+        if counter.load(Ordering::SeqCst) == generation {
+            let _ = thread_app.emit(
+                "pty-exit",
+                PtyExit {
+                    id: thread_id,
+                    generation,
+                },
+            );
+        }
     });
 
     state
@@ -195,4 +232,24 @@ pub fn pty_close(state: State<'_, PtyState>, id: String) -> Result<(), String> {
         let _ = session.child.kill();
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reopening a tab bumps the counter, so a reader thread that still holds the old
+    /// generation can tell it is no longer the current shell.
+    #[test]
+    fn a_reopened_terminal_gets_a_new_generation() {
+        let state = PtyState::default();
+        let (counter, first) = state.next_generation("terminal").unwrap();
+        let (same_counter, second) = state.next_generation("terminal").unwrap();
+        assert_eq!(first, 1);
+        assert_eq!(second, 2);
+        assert!(Arc::ptr_eq(&counter, &same_counter), "one counter per id");
+        // The old thread's check is now false, the new one's is true.
+        assert_ne!(counter.load(Ordering::SeqCst), first);
+        assert_eq!(counter.load(Ordering::SeqCst), second);
+    }
 }
