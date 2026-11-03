@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DS·IDE — Layout-Prüfblatt</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --line: #262b36;
+    --text: #e6e9ef;
+    --muted: #98a0b0;
+    --accent: #6ea8fe;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --accent-soft: rgba(110, 168, 254, .12);
+    --ok-soft: rgba(74, 222, 128, .14);
+    --warn-soft: rgba(251, 191, 36, .14);
+    --pad: clamp(16px, 3vw, 40px);
+    --radius: 14px;
+  }
+  /* Light follows the OS — unless the toggle pins it, so both states are checkable. */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --line: #e3e6ec;
+      --text: #1a1d24;
+      --muted: #626a78;
+      --accent: #1c64d9;
+      /* The dark palette's pastel ok/warn are unreadable on white (~1.5:1). */
+      --ok: #166534;
+      --warn: #92400e;
+      --bad: #b91c1c;
+      --accent-soft: rgba(28, 100, 217, .10);
+      --ok-soft: rgba(22, 101, 52, .12);
+      --warn-soft: rgba(146, 64, 14, .12);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f7f8fa;
+    --panel: #ffffff;
+    --line: #e3e6ec;
+    --text: #1a1d24;
+    --muted: #626a78;
+    --accent: #1c64d9;
+    --ok: #166534;
+    --warn: #92400e;
+    --bad: #b91c1c;
+    --accent-soft: rgba(28, 100, 217, .10);
+    --ok-soft: rgba(22, 101, 52, .12);
+    --warn-soft: rgba(146, 64, 14, .12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: var(--pad);
+    max-width: 1080px;
+    margin: 0 auto;
+  }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 28px; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  h1 { font-size: clamp(26px, 4vw, 40px); line-height: 1.15; margin: 0 0 12px; letter-spacing: -.02em; }
+  h1 span { color: var(--accent); }
+  .lede { color: var(--muted); max-width: 62ch; margin: 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 18px;
+  }
+  .card h2 { font-size: 13px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+  .num { font-size: 28px; font-weight: 650; letter-spacing: -.02em; }
+  .bar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 12px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  section { margin-bottom: 32px; }
+  h3 { font-size: 16px; margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  /* The numeric column takes only what it needs; the text column gets the rest. */
+  td.n, th.n { font-variant-numeric: tabular-nums; text-align: right; width: 1%; white-space: nowrap; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  /* Deliberately long words: without this rule a bare string pushes the page sideways. */
+  .wrap-test {
+    background: var(--panel); border: 1px dashed var(--line); border-radius: var(--radius);
+    padding: 14px; font-size: 13px; color: var(--muted);
+    overflow-wrap: anywhere; word-break: break-word;
+  }
+  code { font-family: ui-monospace, "JetBrains Mono", Consolas, monospace; font-size: .92em; background: var(--accent-soft); padding: 1px 5px; border-radius: 5px; }
+  .flex { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  button {
+    font: inherit; font-size: 14px; padding: 9px 16px; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; }
+  summary { cursor: pointer; font-weight: 600; }
+  footer { border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 13px; }
+  /* Keep the drawing at its drawn size; upscaling only fattens the strokes. */
+  svg { display: block; width: 100%; max-width: 420px; height: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <p class="eyebrow">Layout-Prüfblatt · Samstag, 24. Oktober 2026</p>
+  <h1>Ein <span>Prüfstand</span>, der nichts verkaufen will</h1>
+  <p class="lede">Diese Seite existiert, damit ich meine eigene Arbeit ansehen kann. Jedes Element hier
+  ist Absicht: eine Karte, die umbricht, eine Tabelle, die schmal wird, ein String ohne
+  Leerzeichen, der nicht ausbrechen darf.</p>
+</header>
+
+<div class="grid">
+  <div class="card">
+    <h2>Zeichen im Dokument</h2>
+    <div class="num" id="chars">…</div>
+    <div class="bar"><i id="charsbar" style="width:0%"></i></div>
+  </div>
+  <div class="card">
+    <h2>CSS-Variablen</h2>
+    <div class="num">12</div>
+    <div class="bar"><i style="width:48%"></i></div>
+  </div>
+  <div class="card">
+    <h2>Externe Anfragen</h2>
+    <div class="num">0</div>
+    <div class="bar"><i style="width:0%"></i></div>
+  </div>
+</div>
+
+<section>
+  <h3>Was hier geprüft wird</h3>
+  <table>
+    <thead>
+      <tr><th>Eigenschaft</th><th>Erwartung</th><th class="n">Wert</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Grid bricht um</td><td><span class="pill ok">soll</span></td><td class="n">auto-fit</td></tr>
+      <tr><td>Schrift skaliert</td><td><span class="pill ok">soll</span></td><td class="n">clamp()</td></tr>
+      <tr><td>Tabellen-Ziffern</td><td><span class="pill warn">prüfen</span></td><td class="n">tabular</td></tr>
+      <tr><td>Kein Netzverkehr</td><td><span class="pill ok">soll</span></td><td class="n">0</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h3>Der Umbruch-Test</h3>
+  <div class="wrap-test">
+    Ohne Leerzeichen, absichtlich:
+    Donaudampfschifffahrtsgesellschaftskapitaenswitwenrentenversicherungsanstaltsverwaltungsgebaeudekomplexsanierungsgenehmigungsausschussvorsitzendenstellvertreterwahlprotokoll
+    — und ein Pfad: <code>/home/me/Projects/DS.IDE/src-tauri/src/engine/tools.rs</code>
+  </div>
+</section>
+
+<section>
+  <h3>Ein Diagramm, ohne Datei</h3>
+  <svg viewBox="0 0 420 90" role="img" aria-label="Vier Balken">
+    <rect x="0"  y="60" width="60" height="30" rx="4" fill="#6ea8fe" opacity=".85"/>
+    <rect x="80" y="30" width="60" height="60" rx="4" fill="#6ea8fe" opacity=".85"/>
+    <rect x="160" y="45" width="60" height="45" rx="4" fill="#6ea8fe" opacity=".85"/>
+    <rect x="240" y="10" width="60" height="80" rx="4" fill="#6ea8fe" opacity=".85"/>
+    <line x1="0" y1="90" x2="420" y2="90" stroke="#262b36" stroke-width="1"/>
+  </svg>
+</section>
+
+<section>
+  <details>
+    <summary>Aufklappen — das ist der einzige Zustand, der zählt</summary>
+    <p style="margin:12px 0 0;color:var(--muted)">Wenn dieser Text erscheint, funktioniert
+    <code>&lt;details&gt;</code> ohne JavaScript. Wenn nicht, ist der Renderer zu streng.</p>
+  </details>
+</section>
+
+<section class="flex">
+  <button class="primary" id="ping">Zähler</button>
+  <button id="theme" title="Hell/Dunkel/Automatisch">Theme: auto</button>
+  <span class="pill ok" id="count">0 Klicks</span>
+  <span style="color:var(--muted);font-size:13px" id="clock">—</span>
+</section>
+
+<footer>
+  Angelegt von Ziggy. Kein Lorem Ipsum — der Text ist der Test.
+</footer>
+
+<script>
+  const chars = document.body.innerText.length;
+  document.getElementById('chars').textContent = chars.toLocaleString('de-DE');
+  document.getElementById('charsbar').style.width = Math.min(100, chars / 20) + '%';
+
+  // Three states, so the light theme can be inspected on a dark desktop.
+  const themes = ['auto', 'light', 'dark'];
+  let themeIndex = 0;
+  document.getElementById('theme').addEventListener('click', (event) => {
+    themeIndex = (themeIndex + 1) % themes.length;
+    const mode = themes[themeIndex];
+    if (mode === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', mode);
+    event.currentTarget.textContent = 'Theme: ' + mode;
+  });
+  let n = 0;
+  document.getElementById('ping').addEventListener('click', () => {
+    n += 1;
+    document.getElementById('count').textContent = n + (n === 1 ? ' Klick' : ' Klicks');
+  });
+  const tick = () => {
+    const d = new Date();
+    document.getElementById('clock').textContent =
+      d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+  tick();
+  setInterval(tick, 1000);
+</script>
+
+</body>
+</html>

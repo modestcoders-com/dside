@@ -23,7 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 
-# Reference sources kept locally only — third-party dumps, not part of the product
+# Reference sources kept locally only — third-party dumps, not part of the product.
+# `_handover/` holds the copies the user handed over for reading (MiniMax Code, older
+# DS.IDE snapshots); they are never published, and 80 MB of another product's source must
+# not end up in an MIT repository.
+_handover/
+.kilo/
+
 kilocode-main/
 minimax-code-main/
 minimax-jarvis/
