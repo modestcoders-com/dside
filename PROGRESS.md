@@ -4316,3 +4316,40 @@ Live (isolierte Instanz, Port 9336):
   Erwähnung der Screenshots als visuelle Referenz.
 
 Offen: kein Push, kein Tag.
+
+## 101. Die zwei Felder in den Einstellungen (2026-11-03)
+
+Zwei Rückfragen des Nutzers zu „Allgemein → Arbeitsverzeichnis / Projektbasis":
+
+**1. „Brauchen wir das Arbeitsverzeichnis noch, ich habe doch mehrere Projekte?"**
+Ja, aber nicht als zweite Einstellung. `settings.workspace` ist der Ordner, in dem die
+Werkzeuge lesen und schreiben — es gibt genau einen aktiven. Eine Liste kann es nicht werden,
+ohne die Rechte (`workspaceOnly`) und den Dateibaum zu verwässern. Die Liste der Projekte steht
+links; das Feld zeigt, welches gerade aktiv ist.
+
+**2. „Aktives Projekt: no-name — ich habe aber __modestcoder.org und no-name offen."**
+Die Zeile war inhaltlich richtig (der aktive Thread TallyGrip hing an `no-name`), aber sie
+stand als zweite Zeile *unter* der Projektbasis und las sich wie deren Zusammenfassung. Und sie
+war doppelt: dasselbe Feld stand schon darüber.
+
+**Änderungen:**
+- **Ein Feld statt zwei Beschriftungen**: „Arbeitsverzeichnis" heißt jetzt **„Aktives
+  Projekt"** und trägt den Pfad. Die separate Zeile „Aktives Projekt: …" ist weg.
+- **Reihenfolge**: erst **Projektbasis** (die Quelle), dann **Aktives Projekt** (der Zustand).
+  Damit liest sich der Block als Ursache → Wirkung.
+- **Beschreibung**: „Der Ordner, in dem der Begleiter liest und schreibt. Er folgt dem
+  geöffneten Thread — Projekte wechselst du links in der Leiste." Das beantwortet die Frage im
+  Feld selbst.
+- Der Reload-Knopf daneben hat einen eigenen Titel („Ordner neu laden und den geöffneten
+  Thread daran binden"), statt sich „Aktives Projekt" zu nennen.
+- `settings.general.activeProject` entfällt (506 Schlüssel).
+
+**Geprüft:** `pnpm build` grün, `cargo test --lib` 76 / 14. Live (isolierte Instanz, Port
+9337): Reihenfolge „Projektbasis" → „Aktives Projekt", kein zweiter Hinweis mehr, beide mit
+Pfad; Screenshot `/tmp/pt2/settings2-crop.png`.
+
+Beim Umbau ist mir ein Fehler unterlaufen, den ich notiere, weil er lehrreich ist: Ein
+`replace` über alle `workspace:`-Zeilen eines Katalogs traf auch den Datei-Tab-Block und die
+Diagnose. Aufgefallen im `git diff`, korrigiert durch Zurücksetzen der sechs Kataloge und
+gezieltes Ändern **innerhalb** des `general`-Blocks per Zeilenbereich — nicht per Suchtext
+über die ganze Datei.

@@ -431,12 +431,13 @@ export const en: Messages = {
       readingSizeDesc: "Size for the conversation and the previews",
       language: "Language",
       languageDesc: "Language of the user interface",
-      workspace: "Workspace",
-      workspaceDesc: "Folder used in the Work Area",
+      workspace: "Active project",
+      workspaceDesc:
+        "The folder the partner reads and writes in. It follows the open thread — switch projects in the rail on the left.",
+      workspaceReload: "Reload the folder and bind the open thread to it",
       projectsRoot: "Project base",
       projectsRootDesc:
         "Folder whose subfolders appear as projects in the left rail. The tools still work only inside the active project.",
-      activeProject: "Active project",
       displayName: "Display name",
       displayNameDesc: "Shown at the bottom of the rail. Empty means the system user name.",
       providerDesc: "Account, credits and usage live at DeepSeek.",

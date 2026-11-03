@@ -427,12 +427,13 @@ export const zhHans: Messages = {
       readingSizeDesc: "对话和预览的字号",
       language: "语言",
       languageDesc: "用户界面语言",
-      workspace: "工作目录",
-      workspaceDesc: "在工作区中使用的文件夹",
+      workspace: "当前项目",
+      workspaceDesc:
+        "伙伴在此文件夹中读取和写入。它会跟随当前打开的会话——在左侧栏切换项目。",
+      workspaceReload: "重新读取文件夹并将当前会话绑定到它",
       projectsRoot: "项目根目录",
       projectsRootDesc:
         "其子文件夹会作为项目显示在左侧栏中。工具仍只在当前项目中工作。",
-      activeProject: "当前项目",
       displayName: "显示名称",
       displayNameDesc: "显示在左下角的栏中。留空则使用系统名称。",
       providerDesc: "账户、余额和使用情况由 DeepSeek 提供",

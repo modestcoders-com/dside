@@ -18,7 +18,7 @@ import type { Locale, MessageKey } from "../../i18n";
 import type { PermissionMode } from "../../types";
 import { links } from "../../engine/links";
 import { settings } from "../../stores/settings";
-import { activeProject, bindActiveThread } from "../../composables/useProjects";
+import { bindActiveThread } from "../../composables/useProjects";
 import {
   balance,
   balanceError,
@@ -443,6 +443,26 @@ watch(
             </select>
           </div>
 
+          <!-- The base first, then the active project: the base is where the projects come
+               from, the active one is the state that follows the open thread. -->
+          <div class="row">
+            <div class="text">
+              <div class="label">{{ t("settings.general.projectsRoot") }}</div>
+              <div class="desc">{{ t("settings.general.projectsRootDesc") }}</div>
+            </div>
+            <div class="workspace">
+              <input v-model="settings.projectsRoot" class="input" />
+              <button
+                class="mini"
+                type="button"
+                :title="t('workspacePicker.chooseShort')"
+                @click="projectsRootPickerOpen = true"
+              >
+                <Icon name="folder" :size="14" />
+              </button>
+            </div>
+          </div>
+
           <div class="row">
             <div class="text">
               <div class="label">{{ t("settings.general.workspace") }}</div>
@@ -461,36 +481,13 @@ watch(
               <button
                 class="mini"
                 type="button"
-                :title="t('settings.general.activeProject')"
+                :title="t('settings.general.workspaceReload')"
                 @click="bindActiveThread(settings.workspace)"
               >
                 <Icon name="reload" :size="14" />
               </button>
             </div>
           </div>
-
-          <!-- The base is only listed, never written to: the active project above stays the
-               one folder the tools may touch. -->
-          <div class="row">
-            <div class="text">
-              <div class="label">{{ t("settings.general.projectsRoot") }}</div>
-              <div class="desc">{{ t("settings.general.projectsRootDesc") }}</div>
-            </div>
-            <div class="workspace">
-              <input v-model="settings.projectsRoot" class="input" />
-              <button
-                class="mini"
-                type="button"
-                :title="t('workspacePicker.chooseShort')"
-                @click="projectsRootPickerOpen = true"
-              >
-                <Icon name="folder" :size="14" />
-              </button>
-            </div>
-          </div>
-          <p v-if="activeProject" class="hint">
-            {{ t("settings.general.activeProject") }}: {{ activeProject }}
-          </p>
 
           <ToggleRow
             v-model="settings.showInMenuBar"

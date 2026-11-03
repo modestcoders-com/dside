@@ -432,12 +432,13 @@ export const de = {
       readingSizeDesc: "Größe für Gespräch und Vorschau",
       language: "Sprache",
       languageDesc: "Sprache der Benutzeroberfläche",
-      workspace: "Arbeitsverzeichnis",
-      workspaceDesc: "Ordner, der im Arbeitsbereich verwendet wird",
+      workspace: "Aktives Projekt",
+      workspaceDesc:
+        "Der Ordner, in dem der Begleiter liest und schreibt. Er folgt dem geöffneten Thread — Projekte wechselst du links in der Leiste.",
+      workspaceReload: "Ordner neu laden und den geöffneten Thread daran binden",
       projectsRoot: "Projektbasis",
       projectsRootDesc:
         "Oberverzeichnis, dessen Unterordner im linken Menü als Projekte erscheinen. Die Werkzeuge arbeiten weiterhin nur im aktiven Projekt.",
-      activeProject: "Aktives Projekt",
       displayName: "Anzeigename",
       displayNameDesc: "Erscheint unten links in der Leiste. Leer heißt: Systemname.",
       providerDesc: "Konto, Guthaben und Nutzung liegen bei DeepSeek.",

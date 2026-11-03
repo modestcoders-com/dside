@@ -430,12 +430,13 @@ export const es: Messages = {
       readingSizeDesc: "Tamaño para la conversación y las vistas previas",
       language: "Idioma",
       languageDesc: "Idioma de la interfaz de usuario",
-      workspace: "Directorio de trabajo",
-      workspaceDesc: "Carpeta usada en el área de trabajo",
+      workspace: "Proyecto activo",
+      workspaceDesc:
+        "La carpeta en la que el compañero lee y escribe. Sigue el hilo abierto: cambia de proyecto en la barra lateral izquierda.",
+      workspaceReload: "Recargar la carpeta y vincular el hilo abierto",
       projectsRoot: "Base de proyectos",
       projectsRootDesc:
         "Carpeta cuyas subcarpetas aparecen como proyectos en la barra lateral. Las herramientas siguen trabajando solo dentro del proyecto activo.",
-      activeProject: "Proyecto activo",
       displayName: "Nombre de visualización",
       displayNameDesc: "Aparece en la parte inferior izquierda de la barra. Dejar vacío significa: nombre del sistema.",
       providerDesc: "Cuenta, saldo y uso están con DeepSeek.",

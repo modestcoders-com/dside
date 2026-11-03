@@ -71,17 +71,16 @@ onMounted(async () => {
       </div>
     </header>
 
-    <!-- "Built with" as one quiet strip instead of a card of four big logos. -->
-    <div class="strip">
-      <span class="strip-label">{{ t("about.builtWith") }}</span>
-      <span v-for="tool in stack" :key="tool.name" class="tool">
-        <img :src="tool.logo" :alt="tool.name" />
-        <span>{{ tool.name }}</span>
-      </span>
-    </div>
-
     <div class="grid">
       <section class="card facts">
+        <!-- "Built with" as one quiet strip instead of a card of four big logos. -->
+        <div class="strip">
+          <span class="label">{{ t("about.builtWith") }}</span>
+          <span v-for="tool in stack" :key="tool.name" class="value tool">
+            <img :src="tool.logo" :alt="tool.name" />
+            <span>{{ tool.name }}</span>
+          </span>
+        </div>
         <div class="fact">
           <span class="label">{{ t("about.license") }}</span>
           <span class="value">{{ t("about.licenseValue") }}</span>

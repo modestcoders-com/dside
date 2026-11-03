@@ -431,12 +431,13 @@ export const fr: Messages = {
       readingSizeDesc: "Taille de la conversation et des aperçus",
       language: "Langue",
       languageDesc: "Langue de l'interface utilisateur",
-      workspace: "Répertoire de travail",
-      workspaceDesc: "Dossier utilisé dans l'espace de travail",
+      workspace: "Projet actif",
+      workspaceDesc:
+        "Le dossier dans lequel le compagnon lit et écrit. Il suit le fil ouvert — changez de projet dans la barre latérale à gauche.",
+      workspaceReload: "Recharger le dossier et y rattacher le fil ouvert",
       projectsRoot: "Base des projets",
       projectsRootDesc:
         "Dossier dont les sous-dossiers apparaissent comme projets dans la barre latérale. Les outils travaillent toujours uniquement dans le projet actif.",
-      activeProject: "Projet actif",
       displayName: "Nom d'affichage",
       displayNameDesc: "S'affiche en bas à gauche de la barre. Vide signifie nom du système.",
       providerDesc: "Compte, solde et utilisation chez DeepSeek.",
