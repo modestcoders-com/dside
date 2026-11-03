@@ -14,6 +14,17 @@ export const zhHans: Messages = {
     collapseSidebar: "收起侧边栏",
     expandSidebar: "展开侧边栏",
   },
+  projects: {
+    none: "无项目",
+    noneHint: "工具在没有项目文件夹的情况下工作",
+    newThread: "在 {project} 中新建会话",
+    choose: "选择项目",
+    assignTo: "将「{title}」归入项目",
+    noBase: "尚未设置项目根目录 —— 见“设置 → 通用”。",
+    openFolder: "打开文件夹…",
+    moveTo: "移动到项目",
+  },
+
   sections: {
     pinned: "固定",
     scheduled: "计划",
@@ -418,6 +429,10 @@ export const zhHans: Messages = {
       languageDesc: "用户界面语言",
       workspace: "工作目录",
       workspaceDesc: "在工作区中使用的文件夹",
+      projectsRoot: "项目根目录",
+      projectsRootDesc:
+        "其子文件夹会作为项目显示在左侧栏中。工具仍只在当前项目中工作。",
+      activeProject: "当前项目",
       displayName: "显示名称",
       displayNameDesc: "显示在左下角的栏中。留空则使用系统名称。",
       providerDesc: "账户、余额和使用情况由 DeepSeek 提供",

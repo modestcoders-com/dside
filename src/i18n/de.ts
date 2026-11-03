@@ -12,6 +12,17 @@ export const de = {
     collapseSidebar: "Seitenleiste einklappen",
     expandSidebar: "Seitenleiste ausklappen",
   },
+  projects: {
+    none: "Ohne Projekt",
+    noneHint: "Die Werkzeuge laufen in keinem Projektordner",
+    newThread: "Neuer Thread in {project}",
+    choose: "Projekt wählen",
+    assignTo: "„{title}“ einem Projekt zuordnen",
+    noBase: "Keine Projektbasis eingetragen — in den Einstellungen unter „Allgemein“.",
+    openFolder: "Ordner öffnen…",
+    moveTo: "In Projekt verschieben",
+  },
+
   sections: {
     pinned: "Angeheftet",
     scheduled: "Geplant",
@@ -423,6 +434,10 @@ export const de = {
       languageDesc: "Sprache der Benutzeroberfläche",
       workspace: "Arbeitsverzeichnis",
       workspaceDesc: "Ordner, der im Arbeitsbereich verwendet wird",
+      projectsRoot: "Projektbasis",
+      projectsRootDesc:
+        "Oberverzeichnis, dessen Unterordner im linken Menü als Projekte erscheinen. Die Werkzeuge arbeiten weiterhin nur im aktiven Projekt.",
+      activeProject: "Aktives Projekt",
       displayName: "Anzeigename",
       displayNameDesc: "Erscheint unten links in der Leiste. Leer heißt: Systemname.",
       providerDesc: "Konto, Guthaben und Nutzung liegen bei DeepSeek.",

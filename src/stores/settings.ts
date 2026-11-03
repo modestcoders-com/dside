@@ -20,7 +20,10 @@ export interface SettingsState {
   /** Let the work area follow files and pages the companion opens. */
   followCompanion: boolean;
   pinnedEditorId: string | null;
+  /** The active project: the folder the tools read and write in. */
   workspace: string;
+  /** The folder whose subfolders are offered as projects. Only ever listed, never written to. */
+  projectsRoot: string;
   baseUrl: string;
   model: string;
   displayName: string;
@@ -82,6 +85,7 @@ const PERSISTED_KEYS: (keyof SettingsState)[] = [
   "followCompanion",
   "pinnedEditorId",
   "workspace",
+  "projectsRoot",
   "baseUrl",
   "model",
   "displayName",
@@ -110,6 +114,7 @@ const defaults: SettingsState = {
   followCompanion: true,
   pinnedEditorId: null,
   workspace: "",
+  projectsRoot: "",
   baseUrl: "https://api.deepseek.com",
   model: MODEL_BY_MODE.everyday,
   displayName: "",

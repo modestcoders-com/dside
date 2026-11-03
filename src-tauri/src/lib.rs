@@ -581,6 +581,46 @@ fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(&target).map_err(|error| error.to_string())
 }
 
+/// The folders a project base contains, for the dropdown in the left rail. Directories only,
+/// nothing filtered by name: deciding which folder "is a project" would be a guess, and a
+/// hidden folder the user expects to see is worse than one that is not a project.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectFolder {
+    name: String,
+    path: String,
+}
+
+#[tauri::command]
+fn list_project_folders(root: String) -> Result<Vec<ProjectFolder>, String> {
+    // A dropdown cannot show an unbounded list, and a wrong base (the home directory) is
+    // exactly the case that produces one.
+    const MAX_FOLDERS: usize = 500;
+
+    let target = PathBuf::from(&root);
+    if !target.is_dir() {
+        return Err(format!("path {root} does not exist or is not a directory"));
+    }
+
+    let mut folders = Vec::new();
+    for entry in fs::read_dir(&target).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        folders.push(ProjectFolder {
+            name: entry.file_name().to_string_lossy().to_string(),
+            path: path.to_string_lossy().to_string(),
+        });
+        if folders.len() >= MAX_FOLDERS {
+            break;
+        }
+    }
+    folders.sort_by_key(|folder| folder.name.to_lowercase());
+    Ok(folders)
+}
+
 /// Reads a binary file as base64 so the webview can preview it (PDF). Capped, so a stray
 /// click on a huge file cannot eat the webview's memory.
 #[tauri::command]
@@ -1232,6 +1272,7 @@ pub fn run() {
             open_workspace_in_editor,
             read_workspace_tree,
             read_dir_children,
+            list_project_folders,
             read_text_file,
             read_file_base64,
             file_versions,
@@ -1268,6 +1309,7 @@ pub fn run() {
             db::sessions_archived,
             db::session_archive,
             db::session_create,
+            db::session_set_workspace,
             db::session_history,
             db::session_resume,
             db::session_delete,
@@ -1360,6 +1402,27 @@ mod tests {
             !backend.iter().any(|entry| entry.name.contains("dependencies")),
             "sections are not packages: {backend:?}"
         );
+    }
+
+    /// The project dropdown is fed from here: directories only, sorted, and a wrong base path
+    /// has to fail loudly instead of showing an empty list that looks like "no projects".
+    #[test]
+    fn the_project_folders_are_directories_sorted_by_name() {
+        let base = std::env::temp_dir().join(format!("ds-ide-folders-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        fs::create_dir_all(base.join("zeta")).unwrap();
+        fs::create_dir_all(base.join("Alpha")).unwrap();
+        fs::create_dir_all(base.join(".hidden")).unwrap();
+        fs::write(base.join("notes.txt"), b"not a folder").unwrap();
+
+        let folders = list_project_folders(base.to_string_lossy().to_string()).unwrap();
+        let names: Vec<&str> = folders.iter().map(|folder| folder.name.as_str()).collect();
+        // Case-insensitive order, hidden folders included: nothing is filtered by name.
+        assert_eq!(names, vec![".hidden", "Alpha", "zeta"]);
+        assert!(folders.iter().all(|folder| folder.path.starts_with(&base.to_string_lossy().to_string())));
+
+        assert!(list_project_folders(base.join("missing").to_string_lossy().to_string()).is_err());
+        let _ = fs::remove_dir_all(&base);
     }
 
     /// The pool is embedded and searched by meaning; if the file or the field names ever

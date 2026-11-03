@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import Icon from "../Icon.vue";
 import { t } from "../../i18n";
@@ -233,6 +233,18 @@ function groupTitle(list: GitEntry[]): string {
 onMounted(() => {
   void refresh();
 });
+
+// A project switch changes which repository this panel is about. Without this the list keeps
+// showing the previous project's files — the panel is mounted once and lives on.
+watch(
+  () => settings.workspace,
+  () => {
+    selected.value = null;
+    diff.value = "";
+    notice.value = null;
+    void refresh();
+  },
+);
 </script>
 
 <template>

@@ -13,6 +13,17 @@ export const fr: Messages = {
     collapseSidebar: "Réduire la barre latérale",
     expandSidebar: "Développer la barre latérale",
   },
+  projects: {
+    none: "Sans projet",
+    noneHint: "Les outils travaillent sans dossier de projet",
+    newThread: "Nouveau fil dans {project}",
+    choose: "Choisir un projet",
+    assignTo: "Affecter « {title} » à un projet",
+    noBase: "Aucun dossier de base défini — voir Réglages → Général.",
+    openFolder: "Ouvrir un dossier…",
+    moveTo: "Déplacer vers un projet",
+  },
+
   sections: {
     pinned: "Épinglé",
     scheduled: "Planifié",
@@ -422,6 +433,10 @@ export const fr: Messages = {
       languageDesc: "Langue de l'interface utilisateur",
       workspace: "Répertoire de travail",
       workspaceDesc: "Dossier utilisé dans l'espace de travail",
+      projectsRoot: "Base des projets",
+      projectsRootDesc:
+        "Dossier dont les sous-dossiers apparaissent comme projets dans la barre latérale. Les outils travaillent toujours uniquement dans le projet actif.",
+      activeProject: "Projet actif",
       displayName: "Nom d'affichage",
       displayNameDesc: "S'affiche en bas à gauche de la barre. Vide signifie nom du système.",
       providerDesc: "Compte, solde et utilisation chez DeepSeek.",

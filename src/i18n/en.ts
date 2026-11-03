@@ -14,6 +14,17 @@ export const en: Messages = {
     collapseSidebar: "Collapse sidebar",
     expandSidebar: "Expand sidebar",
   },
+  projects: {
+    none: "No project",
+    noneHint: "The tools run without a project folder",
+    newThread: "New thread in {project}",
+    choose: "Choose project",
+    assignTo: "Assign “{title}” to a project",
+    noBase: "No project base set — add one in Settings → General.",
+    openFolder: "Open folder…",
+    moveTo: "Move to project",
+  },
+
   sections: {
     pinned: "Pinned",
     scheduled: "Scheduled",
@@ -422,6 +433,10 @@ export const en: Messages = {
       languageDesc: "Language of the user interface",
       workspace: "Workspace",
       workspaceDesc: "Folder used in the Work Area",
+      projectsRoot: "Project base",
+      projectsRootDesc:
+        "Folder whose subfolders appear as projects in the left rail. The tools still work only inside the active project.",
+      activeProject: "Active project",
       displayName: "Display name",
       displayNameDesc: "Shown at the bottom of the rail. Empty means the system user name.",
       providerDesc: "Account, credits and usage live at DeepSeek.",

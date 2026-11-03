@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Icon from "./Icon.vue";
 import DeepSeekWhale from "./DeepSeekWhale.vue";
+import WorkspacePicker from "./WorkspacePicker.vue";
 import { t } from "../i18n";
 import { deepSeekMark } from "./deepseek-mark";
 import { everydayMode } from "../engine/mode";
@@ -13,6 +14,15 @@ import { activeSessionId, sessions } from "../stores/sessions";
 import { settings } from "../stores/settings";
 import { openSearch, openSettings, railCollapsed } from "../stores/ui";
 import { openTab } from "../stores/workArea";
+import { groupByProject } from "../lib/projects";
+import {
+  activeProject,
+  activateProject,
+  loadProjectFolders,
+  projectError,
+  projectFolders,
+  switchProject,
+} from "../composables/useProjects";
 import {
   clearApiKey,
   createSession,
@@ -114,7 +124,6 @@ async function archiveSession(session: Session) {
 }
 
 const ALL_PRIMARY_ITEMS = [
-  { icon: "plus", key: "nav.newTask", soon: false },
   { icon: "search", key: "nav.search", soon: false },
   { icon: "grid", key: "nav.skills", soon: false },
   { icon: "clock", key: "nav.scheduled", soon: false },
@@ -123,7 +132,7 @@ const ALL_PRIMARY_ITEMS = [
 /** Everyday mode leaves out the skills and schedules entries. */
 const primaryItems = computed(() =>
   everydayMode.value
-    ? ALL_PRIMARY_ITEMS.filter((item) => item.key === "nav.newTask" || item.key === "nav.search")
+    ? ALL_PRIMARY_ITEMS.filter((item) => item.key === "nav.search")
     : ALL_PRIMARY_ITEMS,
 );
 
@@ -140,11 +149,68 @@ function groupItems(group: SessionGroup) {
   return sessions.value.filter((session) => session.group === group);
 }
 
-function onPrimary(key: string) {
-  if (key === "nav.newTask") {
-    void createSession();
+/** The "Projekte" section, split by the folder each thread was started in. */
+const projectBuckets = computed(() =>
+  groupByProject(groupItems("project"), t("projects.none")),
+);
+
+/**
+ * One menu, two uses: choose the project to work in, or move a thread into one. Keeping it a
+ * single panel means there is exactly one list of projects in the app.
+ */
+const projectMenuOpen = ref(false);
+const assignTarget = ref<Session | null>(null);
+const pickerOpen = ref(false);
+
+function openProjectMenu(): void {
+  assignTarget.value = null;
+  projectMenuOpen.value = !projectMenuOpen.value;
+}
+
+function openAssignMenu(session: Session): void {
+  menuSession.value = null;
+  assignTarget.value = session;
+  projectMenuOpen.value = true;
+}
+
+function closeProjectMenu(): void {
+  projectMenuOpen.value = false;
+  assignTarget.value = null;
+}
+
+async function chooseProject(path: string): Promise<void> {
+  const target = assignTarget.value;
+  closeProjectMenu();
+  if (!target) {
+    await switchProject(path);
     return;
   }
+  await invoke("session_set_workspace", { id: target.id, workspace: path });
+  await loadSessions();
+  // Moving the thread that is open moves the tools with it: otherwise the next message in
+  // this thread would file its work under the folder it was moved *away* from.
+  if (target.id === activeSessionId.value) await activateProject(path);
+}
+
+function chooseFolder(path: string): void {
+  pickerOpen.value = false;
+  void chooseProject(path);
+}
+
+/** A thread in the active project — the same thing "Neue Aufgabe" did. */
+function newThread(): void {
+  void createSession();
+}
+
+// The list is read again when the base changes, so the dropdown never shows another folder's
+// children after the user typed a new base.
+watch(
+  () => settings.projectsRoot,
+  () => void loadProjectFolders(),
+  { immediate: true },
+);
+
+function onPrimary(key: string) {
   if (key === "nav.search") {
     openSearch();
     return;
@@ -177,6 +243,10 @@ function accountSettings() {
         <Icon name="pin" :size="14" />
         <span>{{ menuSession.group === "pinned" ? t("session.unpin") : t("session.pin") }}</span>
       </button>
+      <button class="menu-item" type="button" @click="openAssignMenu(menuSession)">
+        <Icon name="folder" :size="14" />
+        <span>{{ t("projects.moveTo") }}</span>
+      </button>
       <button class="menu-item" type="button" @click="startRename(menuSession)">
         <Icon name="pencil" :size="14" />
         <span>{{ t("session.rename") }}</span>
@@ -186,6 +256,81 @@ function accountSettings() {
         <span>{{ t("session.archive") }}</span>
       </button>
     </div>
+    <!-- The project row replaces "Neue Aufgabe": it says which folder the tools are pointing
+         at and starts the next thread in it. Two states, one place. -->
+    <div class="project-row">
+      <button
+        class="project-pick"
+        :class="{ open: projectMenuOpen }"
+        type="button"
+        :title="settings.workspace || t('projects.noneHint')"
+        @click="openProjectMenu"
+      >
+        <Icon name="folder" :size="14" />
+        <span class="project-name">{{ activeProject || t("projects.none") }}</span>
+        <Icon name="chevron-down" :size="12" class="project-chevron" />
+      </button>
+      <button
+        class="project-new"
+        type="button"
+        :title="t('projects.newThread', { project: activeProject || t('projects.none') })"
+        @click="newThread"
+      >
+        <Icon name="plus" :size="14" />
+      </button>
+    </div>
+
+    <template v-if="projectMenuOpen">
+      <div class="menu-backdrop" @click="closeProjectMenu"></div>
+      <div class="project-menu">
+        <div class="menu-head">
+          <span class="menu-name">
+            {{
+              assignTarget
+                ? t("projects.assignTo", { title: assignTarget.title })
+                : t("projects.choose")
+            }}
+          </span>
+        </div>
+        <div class="project-list">
+          <button
+            v-for="folder in projectFolders"
+            :key="folder.path"
+            class="menu-item"
+            type="button"
+            :title="folder.path"
+            @click="chooseProject(folder.path)"
+          >
+            <Icon
+              :name="folder.path === settings.workspace ? 'check' : 'folder'"
+              :size="14"
+            />
+            <span class="session-title">{{ folder.name }}</span>
+          </button>
+          <p v-if="projectError" class="menu-note warn">{{ projectError }}</p>
+          <p v-else-if="!projectFolders.length" class="menu-note">
+            {{ t("projects.noBase") }}
+          </p>
+        </div>
+        <div class="menu-separator"></div>
+        <button class="menu-item" type="button" @click="chooseProject('')">
+          <Icon name="x" :size="14" />
+          <span>{{ t("projects.none") }}</span>
+        </button>
+        <button class="menu-item" type="button" @click="pickerOpen = true">
+          <Icon name="folder" :size="14" />
+          <span>{{ t("projects.openFolder") }}</span>
+        </button>
+      </div>
+    </template>
+
+    <WorkspacePicker
+      :open="pickerOpen"
+      :initial="settings.workspace || settings.projectsRoot"
+      @choose="chooseFolder"
+      @close="pickerOpen = false"
+    />
+
     <nav class="rail-nav">
       <button
         v-for="item in primaryItems"
@@ -203,29 +348,69 @@ function accountSettings() {
     <div class="rail-scroll">
       <section v-for="group in sectionOrder" :key="group" class="rail-section">
         <div class="section-head">{{ t(sectionKeys[group]) }}</div>
-        <p v-if="groupItems(group).length === 0" class="empty">{{ t("sections.noTasks") }}</p>
-        <button
-          v-for="session in groupItems(group)"
-          :key="session.id"
-          class="session"
-          :class="{ active: session.id === activeSessionId }"
-          type="button"
-          @click="openSession(session.id)"
-          @contextmenu.prevent="openMenu($event, session)"
-        >
-          <Icon name="doc" :size="14" />
-          <input
-            v-if="renamingId === session.id"
-            v-model="renameDraft"
-            v-focus
-            class="rename"
-            @click.stop
-            @keydown.enter.prevent="commitRename"
-            @keydown.esc.prevent="renamingId = null"
-            @blur="commitRename"
-          />
-          <span v-else class="session-title">{{ session.title }}</span>
-        </button>
+
+        <!-- Threads grouped by the project they belong to; the folder is the header. -->
+        <template v-if="group === 'project'">
+          <p v-if="projectBuckets.length === 0" class="empty">{{ t("sections.noTasks") }}</p>
+          <div v-for="bucket in projectBuckets" :key="bucket.workspace || '__none'">
+            <div
+              v-if="bucket.workspace || projectBuckets.length > 1"
+              class="project-head"
+              :title="bucket.workspace || t('projects.noneHint')"
+            >
+              <Icon name="folder" :size="12" />
+              <span class="session-title">{{ bucket.label }}</span>
+            </div>
+            <button
+              v-for="session in bucket.threads"
+              :key="session.id"
+              class="session"
+              :class="{ active: session.id === activeSessionId }"
+              type="button"
+              @click="openSession(session.id)"
+              @contextmenu.prevent="openMenu($event, session)"
+            >
+              <Icon name="doc" :size="14" />
+              <input
+                v-if="renamingId === session.id"
+                v-model="renameDraft"
+                v-focus
+                class="rename"
+                @click.stop
+                @keydown.enter.prevent="commitRename"
+                @keydown.esc.prevent="renamingId = null"
+                @blur="commitRename"
+              />
+              <span v-else class="session-title">{{ session.title }}</span>
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
+          <p v-if="groupItems(group).length === 0" class="empty">{{ t("sections.noTasks") }}</p>
+          <button
+            v-for="session in groupItems(group)"
+            :key="session.id"
+            class="session"
+            :class="{ active: session.id === activeSessionId }"
+            type="button"
+            @click="openSession(session.id)"
+            @contextmenu.prevent="openMenu($event, session)"
+          >
+            <Icon name="doc" :size="14" />
+            <input
+              v-if="renamingId === session.id"
+              v-model="renameDraft"
+              v-focus
+              class="rename"
+              @click.stop
+              @keydown.enter.prevent="commitRename"
+              @keydown.esc.prevent="renamingId = null"
+              @blur="commitRename"
+            />
+            <span v-else class="session-title">{{ session.title }}</span>
+          </button>
+        </template>
       </section>
     </div>
 
@@ -313,6 +498,129 @@ function accountSettings() {
   display: flex;
   flex-direction: column;
   padding: 14px 8px 8px;
+}
+
+/* The project row: a folder picker where "Neue Aufgabe" used to be. The name takes the
+   space it can get, the chevron and the "+" stay fixed so a long path never pushes them out. */
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 8px 0;
+}
+
+.project-pick,
+.project-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.project-pick {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px 0 9px;
+  text-align: left;
+}
+
+.project-pick:hover,
+.project-pick.open {
+  background: var(--bg-hover);
+}
+
+.project-pick.open {
+  border-color: var(--accent);
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-chevron {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.project-new {
+  flex: none;
+  justify-content: center;
+  width: 30px;
+  padding: 0;
+  color: var(--text-muted);
+}
+
+.project-new:hover {
+  background: var(--bg-hover);
+  color: var(--text-strong);
+}
+
+.project-menu {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  left: 8px;
+  z-index: 43;
+  min-width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.project-menu .menu-head {
+  padding: 5px 8px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.menu-note {
+  margin: 4px 8px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.menu-note.warn {
+  color: var(--danger);
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--border);
+}
+
+/* A folder header inside "Projekte": one level of nesting, no extra chrome. */
+.project-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.project-head .session-title {
+  min-width: 0;
 }
 
 .nav-item,

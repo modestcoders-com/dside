@@ -43,6 +43,7 @@ import { EVERYDAY_DISABLED_TOOLS, everydayMode } from "../engine/mode";
 import { partnerName, refreshPartnerName } from "../stores/partner";
 import { loadModels, modelChoices } from "../stores/models";
 import { saveUiState } from "../lib/uiState";
+import { samePath } from "../lib/projects";
 import { followToolResult, followToolStart } from "./useFollow";
 import { t } from "../i18n";
 
@@ -338,16 +339,19 @@ export async function initEngine(): Promise<void> {
     }
     extractLegacyKey();
     await ensureWorkspace();
-    // Check the workspace at startup, not only when the file tab first mounts: the
-    // composer's status line shows the difference between "empty" and "gone".
-    await reloadTree();
     await refreshSecret();
     await refreshPartnerName();
     // Ask the provider which models exist before the first turn: an id it does not know would
     // fail every request, and the field would look fine while doing it.
     await loadModels();
-    await configureEngine();
     await loadSessions();
+    // The thread that was open decides the project before the engine is configured, so the
+    // first request already carries the right folder.
+    adoptSessionWorkspace(activeSessionId.value);
+    await configureEngine();
+    // Check the workspace at startup, not only when the file tab first mounts: the
+    // composer's status line shows the difference between "empty" and "gone".
+    await reloadTree();
     await loadHistory(activeSessionId.value);
   })();
   try {
@@ -496,7 +500,26 @@ function timelineFor(row: DbHistoryRow, tools: ToolActivity[]): MessagePart[] {
 export async function openSession(sessionId: string): Promise<void> {
   flushStream();
   selectSession(sessionId);
+  // Choosing a thread chooses its project. A global folder that disagrees with the
+  // conversation on screen is the state this feature exists to remove.
+  if (adoptSessionWorkspace(sessionId)) await reloadTree();
   await loadHistory(sessionId);
+}
+
+/**
+ * Points the tools at the folder this thread was started in. Returns true when the workspace
+ * actually changed, so the caller knows whether the tree has to be read again.
+ *
+ * A thread without a workspace (written before projects existed) leaves the current folder
+ * alone: guessing one from the path would be a silent assumption, and the rail offers an
+ * explicit "move into project" instead.
+ */
+function adoptSessionWorkspace(sessionId: string): boolean {
+  const session = sessions.value.find((entry) => entry.id === sessionId);
+  const workspace = session?.workspace?.trim() ?? "";
+  if (!workspace || samePath(workspace, settings.workspace)) return false;
+  settings.workspace = workspace;
+  return true;
 }
 
 export async function createSession(): Promise<void> {

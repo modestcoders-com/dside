@@ -141,6 +141,15 @@ connection test.
 
 ## Features worth knowing
 
+- **Projects:** the rail's top row is a project picker (folder, name, chevron, "+"). The
+  base folder lives in Settings → General ("Projektbasis"). `settings.workspace` stays the one
+  folder the tools work in; the base is only listed. A thread carries its project in
+  `sessions.workspace`; opening a thread adopts it, switching the project switches to that
+  project's newest thread (or a new one), and any explicit change re-binds the open thread
+  (`bindActiveThread`). Helpers in `src/lib/projects.ts`, state in
+  `src/composables/useProjects.ts`. The git panel watches the workspace; the terminal keeps
+  running and shows its start folder.
+
 ## The whale and the About page
 
 - `src/components/DeepSeekWhale.vue` draws the mark as three paths from

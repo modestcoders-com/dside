@@ -18,6 +18,7 @@ import type { Locale, MessageKey } from "../../i18n";
 import type { PermissionMode } from "../../types";
 import { links } from "../../engine/links";
 import { settings } from "../../stores/settings";
+import { activeProject, bindActiveThread } from "../../composables/useProjects";
 import {
   balance,
   balanceError,
@@ -29,7 +30,6 @@ import {
 } from "../../stores/models";
 import { settingsItem } from "../../stores/ui";
 import { partnerDisplayName } from "../../stores/partner";
-import { reloadTree } from "../../composables/useWorkspace";
 import {
   clearApiKey,
   engineReady,
@@ -44,11 +44,21 @@ const query = ref("");
 const activeItem = ref<string>(settingsItem.value ?? "general");
 const rudderOpen = ref(false);
 const workspacePickerOpen = ref(false);
+const projectsRootPickerOpen = ref(false);
 
+/**
+ * The folder is not a free-floating setting: the open thread moves with it, otherwise the
+ * conversation and the tools would point at different projects until a restart fixed one.
+ */
 function chooseWorkspace(path: string): void {
-  settings.workspace = path;
   workspacePickerOpen.value = false;
-  void reloadTree();
+  void bindActiveThread(path);
+}
+
+/** The base is a list source, not a working folder: nothing is reloaded except the rail. */
+function chooseProjectsRoot(path: string): void {
+  settings.projectsRoot = path;
+  projectsRootPickerOpen.value = false;
 }
 
 const permissionModes: { value: PermissionMode; label: MessageKey; hint: MessageKey; icon: string }[] = [
@@ -439,11 +449,39 @@ watch(activeItem, (value) => {
               >
                 <Icon name="folder" :size="14" />
               </button>
-              <button class="mini" type="button" @click="reloadTree()">
+              <button
+                class="mini"
+                type="button"
+                :title="t('settings.general.activeProject')"
+                @click="bindActiveThread(settings.workspace)"
+              >
                 <Icon name="reload" :size="14" />
               </button>
             </div>
           </div>
+
+          <!-- The base is only listed, never written to: the active project above stays the
+               one folder the tools may touch. -->
+          <div class="row">
+            <div class="text">
+              <div class="label">{{ t("settings.general.projectsRoot") }}</div>
+              <div class="desc">{{ t("settings.general.projectsRootDesc") }}</div>
+            </div>
+            <div class="workspace">
+              <input v-model="settings.projectsRoot" class="input" />
+              <button
+                class="mini"
+                type="button"
+                :title="t('workspacePicker.chooseShort')"
+                @click="projectsRootPickerOpen = true"
+              >
+                <Icon name="folder" :size="14" />
+              </button>
+            </div>
+          </div>
+          <p v-if="activeProject" class="hint">
+            {{ t("settings.general.activeProject") }}: {{ activeProject }}
+          </p>
 
           <ToggleRow
             v-model="settings.showInMenuBar"
@@ -763,6 +801,12 @@ watch(activeItem, (value) => {
       :initial="settings.workspace"
       @choose="chooseWorkspace"
       @close="workspacePickerOpen = false"
+    />
+    <WorkspacePicker
+      :open="projectsRootPickerOpen"
+      :initial="settings.projectsRoot || settings.workspace"
+      @choose="chooseProjectsRoot"
+      @close="projectsRootPickerOpen = false"
     />
   </div>
 </template>

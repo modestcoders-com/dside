@@ -53,10 +53,18 @@ function resizePty(): void {
   void invoke("pty_resize", { id: ID, cols: term.cols, rows: term.rows }).catch(() => undefined);
 }
 
+/**
+ * The folder this shell was started in. A project switch does not move a running process, and
+ * a shell that silently claims to be somewhere else would be worse than one that says where
+ * it is — so the bar shows the start folder, not the current one.
+ */
+const startCwd = ref("");
+
 async function openPty(): Promise<void> {
   if (!term) return;
   exited.value = false;
   failure.value = null;
+  startCwd.value = settings.workspace;
   try {
     await invoke("pty_open", {
       id: ID,
@@ -156,6 +164,7 @@ onBeforeUnmount(() => {
   <div class="terminal-panel">
     <div class="terminal-bar">
       <span class="terminal-title">{{ t("terminal.title") }}</span>
+      <span v-if="startCwd" class="terminal-cwd" :title="startCwd">{{ startCwd }}</span>
       <span v-if="exited" class="terminal-note">{{ t("terminal.exited") }}</span>
       <span v-if="failure" class="terminal-note error">{{ t("terminal.failed", { error: failure }) }}</span>
       <span class="spacer"></span>
@@ -194,6 +203,16 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.terminal-cwd {
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  opacity: 0.75;
 }
 
 .terminal-note {

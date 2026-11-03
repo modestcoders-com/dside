@@ -13,6 +13,17 @@ export const es: Messages = {
     collapseSidebar: "Colapsar barra lateral",
     expandSidebar: "Expandir barra lateral",
   },
+  projects: {
+    none: "Sin proyecto",
+    noneHint: "Las herramientas funcionan sin carpeta de proyecto",
+    newThread: "Nuevo hilo en {project}",
+    choose: "Elegir proyecto",
+    assignTo: "Asignar «{title}» a un proyecto",
+    noBase: "No hay carpeta base de proyectos — configúrala en Ajustes → General.",
+    openFolder: "Abrir carpeta…",
+    moveTo: "Mover a proyecto",
+  },
+
   sections: {
     pinned: "Anclado",
     scheduled: "Programado",
@@ -421,6 +432,10 @@ export const es: Messages = {
       languageDesc: "Idioma de la interfaz de usuario",
       workspace: "Directorio de trabajo",
       workspaceDesc: "Carpeta usada en el área de trabajo",
+      projectsRoot: "Base de proyectos",
+      projectsRootDesc:
+        "Carpeta cuyas subcarpetas aparecen como proyectos en la barra lateral. Las herramientas siguen trabajando solo dentro del proyecto activo.",
+      activeProject: "Proyecto activo",
       displayName: "Nombre de visualización",
       displayNameDesc: "Aparece en la parte inferior izquierda de la barra. Dejar vacío significa: nombre del sistema.",
       providerDesc: "Cuenta, saldo y uso están con DeepSeek.",

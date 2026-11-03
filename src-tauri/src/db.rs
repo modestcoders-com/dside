@@ -698,6 +698,18 @@ impl Db {
         self.ensure_session(id, title, "project", workspace)
     }
 
+    /// Moves a thread into a project after the fact. Threads written before projects existed
+    /// carry an empty workspace; this is how they get one without editing the database.
+    pub fn set_session_workspace(&self, id: &str, workspace: &str) -> Result<(), String> {
+        let conn = self.lock()?;
+        conn.execute(
+            "UPDATE sessions SET workspace = ?2, updated_at = ?3 WHERE id = ?1",
+            params![id, workspace, now()],
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
     pub fn delete_session(&self, id: &str) -> Result<(), String> {
         let conn = self.lock()?;
         conn.execute("DELETE FROM messages WHERE session_id = ?1", params![id])
@@ -2078,6 +2090,15 @@ pub fn session_delete(db: tauri::State<'_, Db>, id: String) -> Result<(), String
     db.delete_session(&id)
 }
 
+#[tauri::command]
+pub fn session_set_workspace(
+    db: tauri::State<'_, Db>,
+    id: String,
+    workspace: String,
+) -> Result<(), String> {
+    db.set_session_workspace(&id, &workspace)
+}
+
 /// Deletes several sessions in one call. The archive uses it for "delete all"; deleting a
 /// single row would otherwise cost one IPC round trip per archived task.
 #[tauri::command]
@@ -3133,6 +3154,31 @@ mod tests {
 
         db.update_session("s1", None, Some("pinned")).unwrap();
         assert_eq!(db.list_sessions().unwrap()[0].group, "pinned");
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// A thread written before projects existed has an empty workspace; assigning one later
+    /// must work without touching the conversation, and must survive a reload.
+    #[test]
+    fn a_thread_can_be_moved_into_a_project() {
+        let directory =
+            std::env::temp_dir().join(format!("ds-ide-project-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let db = Db::open(&directory.join("s.sqlite3")).unwrap();
+
+        db.create_session("s1", "alt", "").unwrap();
+        assert_eq!(db.list_sessions().unwrap()[0].workspace, "");
+
+        db.set_session_workspace("s1", "/p/tallygrip").unwrap();
+        let rows = db.list_sessions().unwrap();
+        assert_eq!(rows[0].workspace, "/p/tallygrip");
+        // Moving it does not rename it.
+        assert_eq!(rows[0].title, "alt");
+
+        // An unknown id is a no-op, not an error: the row may have been archived meanwhile.
+        db.set_session_workspace("gone", "/p/x").unwrap();
 
         let _ = std::fs::remove_dir_all(&directory);
     }

@@ -4177,3 +4177,83 @@ abgeleitet — das wäre eine stille Annahme. Ältere Threads ohne `workspace` e
 **Nicht Teil dieser Notiz:** Die 1.0.8-Sammelliste des Nutzers für die **Vibes**
 (Hanzi-Reste, falsche Bezeichnungen). Angebot steht: `scripts/check-i18n.mjs` dorthin
 portieren, erweitert um eine CJK-Prüfung für Nicht-`zh`-Kataloge.
+
+## 99. Projekte im linken Menü (2026-11-03, siebenundsiebzigste Runde)
+
+Gebaut nach dem Entwurf aus §98b, mit einer Verschärfung, die sich beim Durchspielen als nötig
+erwiesen hat.
+
+### Was es jetzt gibt
+- **Projektzeile statt „Neue Aufgabe"**: Ordner-Symbol, Projektname, Chevron und ein „+"
+  daneben, an derselben Stelle wie vorher der Eintrag. Der „+" legt einen Thread im aktiven
+  Projekt an.
+- **Dropdown** mit den Unterordnern der Projektbasis, „Ohne Projekt" und „Ordner öffnen…".
+  Der aktive Eintrag ist abgehakt.
+- **„Projekte" ist gruppiert**: pro Ordner ein Kopf (`projectLabel`), darunter seine Threads,
+  neueste Gruppe zuerst. Threads ohne Ordner stehen unter „Ohne Projekt" — sie verschwinden
+  nicht, auch wenn ihr Ordner nicht mehr existiert.
+- **Kontextmenü → „In Projekt verschieben"**: damit bekommt ein alter Thread sein Projekt
+  nachträglich, ohne Datenbankarbeit.
+- **Einstellungen → Allgemein → Projektbasis**: das Oberverzeichnis. Darunter „Aktives
+  Projekt: …" — abgeleitet, nicht getippt.
+
+### Die Entscheidung, die keine zwei Wahrheiten zulässt
+`settings.workspace` ist weiterhin *das* Arbeitsverzeichnis der Werkzeuge; die Projektbasis
+ist ein reiner Listenwert. Damit Thread und Ordner nie auseinanderlaufen:
+
+- **Öffnen eines Threads setzt das Verzeichnis** (`adoptSessionWorkspace`, auch beim Start vor
+  `configureEngine`, damit die erste Anfrage schon im richtigen Ordner läuft).
+- **Projektwechsel im Dropdown wechselt auch den Thread**: neuester Thread des Projekts, sonst
+  ein neuer. Die Alternative — alter Thread bleibt offen, Werkzeuge zeigen woandershin — ist
+  genau der Zustand, den das Feature beseitigen soll, und ein Neustart hätte ihn ohnehin
+  zurückgedreht.
+- **Verschieben des offenen Threads zieht die Werkzeuge mit** (`activateProject`).
+- **Die Adresszeile in den Einstellungen bindet ebenfalls um** (`bindActiveThread`), damit
+  ein getippter Pfad nicht neben dem Thread herläuft.
+
+Ohne Projekt (`""`) ist ein gültiger Zustand: Thread ohne Bindung, Baum meldet „Kein
+Arbeitsverzeichnis gewählt". `ensureWorkspace` setzt nur beim Start einen Standard.
+
+### Was mitzieht
+| Teil | Verhalten |
+| --- | --- |
+| Dateibaum | lädt bei jedem Wechsel neu (in `activateProject`) |
+| Git-Panel | **neu**: `watch(settings.workspace)` → `refresh()`, Auswahl wird geleert |
+| Terminal | läuft weiter; der Kopf zeigt den **Startordner**, nicht den aktuellen |
+| Preview | startet bei geändertem Workspace neu (war schon so) |
+| Engine | `configureEngine` bekommt den Workspace aus `settings` — passt |
+| Entwürfe | hängen an der Session, ein Projektwechsel lässt sie stehen |
+
+### Backend
+- **`list_project_folders(root)`**: nur Verzeichnisse, keine Namensfilter (auch `.hidden`),
+  sortiert ohne Rücksicht auf Groß-/Kleinschreibung, Deckel bei 500. Ein falscher Pfad ist ein
+  Fehler, keine leere Liste — sonst sähe „kein Projekt" wie „Ordner leer" aus.
+- **`session_set_workspace(id, workspace)`**: die vorhandene Spalte wird benutzt; keine
+  Migration nötig, weil `sessions.workspace` schon existiert und `session_create` sie füllt.
+- Tests: `the_project_folders_are_directories_sorted_by_name`,
+  `a_thread_can_be_moved_into_a_project` (76 gesamt).
+
+### Geprüft (isolierte Instanz, Port 9335, eigene Daten)
+- `list_project_folders("/tmp/pt")` → projA, projB, projC; fehlender Pfad → Fehler.
+- Basis gesetzt → Leiste zeigt `projA` mit „+", Baum zeigt `README.md`.
+- Dropdown: „Projekt wählen", drei Ordner, „Ohne Projekt", „Ordner öffnen…".
+- Wechsel auf projB → Baum und Git-Panel wechseln; projB mit `git init` zeigt danach
+  `master` und die unversionierte `README.md`, projA „Kein Git-Repository angelegt."
+- Wechsel auf projC (ohne Thread) → legt einen an und öffnet ihn; „+" → zweiter Thread in projC.
+- Wechsel auf projB mit vorhandenem Thread → **öffnet diesen**, nicht einen neuen.
+- Kontextmenü → „In Projekt verschieben" auf einem Thread aus `/home/me` nach projA: Thread
+  wandert in der Liste, der offene Thread zieht seine Werkzeuge mit.
+- Terminal: Kopf zeigt `/tmp/pt/projB`, nach Wechsel auf projA bleibt der Prozess und zeigt
+  weiter `/tmp/pt/projB`; „Neu starten" startet im neuen Ordner.
+- Neustart der App: aktiver Thread und Workspace stimmen überein (projB → projB).
+- Entwurf im Feld bleibt beim Projektwechsel erhalten.
+- `pnpm build` grün (508 Schlüssel, sechs Kataloge), `cargo test --lib` 76 / 14 ignoriert.
+- Screenshot `/tmp/pt/final-rail.png`.
+
+### Gefunden, nicht behoben (gehört nicht in diese Runde)
+Ein **Fenster-Reload** lässt das Terminal „Prozess beendet" anzeigen, obwohl die neue Shell
+läuft: `pty-exit` trägt nur die Terminal-Id, und der sterbende alte Prozess meldet sich beim
+neuen Bauteil mit derselben Id. „Neu starten" behebt es; sauber wäre ein Generationszähler in
+`pty_open`. Aufgenommen für eine eigene Runde.
+
+Offen: kein Push, kein Tag — Freigabe des Nutzers steht aus.
