@@ -4458,3 +4458,46 @@ grün (506 Schlüssel).
 Nicht in dieser Runde: Der Nutzer bemerkte am Rande, dass ein **Export** eines Verlaufs nur die
 Werkzeugnamen zeigt, nicht ihre Ausgaben. DS.IDE hat überhaupt keinen Verlaufs-Export; die
 Beobachtung betrifft also das Werkzeug, mit dem er schreibt — notiert, nicht gebaut.
+
+## 105. Die 80 MB aus der Geschichte (2026-11-03)
+
+Der Button-Push in DeepVibe hatte den ganzen Arbeitsbaum committet: 878 Dateien aus
+`_handover/` (MiniMax Codes Daemon, zwei ältere DS.IDE-Snapshots, 80 MB) und die
+`.kilo`-Konfiguration. Nach `origin` (privates Gitea) ging das durch, **nach GitHub nicht** —
+dort stand weiter `3f905a9`. Aufgefallen beim Nachsehen, nicht durch einen Fehler.
+
+**Warum die Ignorierliste nicht griff:** Sie war vollständig für alles, was vorher da war —
+`node_modules`, `dist`, Logs, Secrets und die Referenz-Checkouts namentlich. `_handover/` hat der
+Nutzer erst am 28.10. angelegt, um mir den Daemon zu geben; der Ordner stand nie in der Liste,
+auch nicht in AGENTS.md. `.kilo/` entstand beim Benutzen von Kilo Code. Es fehlten also zwei
+Einträge, nicht die Datei.
+
+**Was geschah:**
+- `_handover/` und `.kilo/` aus der Versionierung genommen (`git rm --cached`), beide in
+  `.gitignore` — die Dateien bleiben auf der Platte.
+- Aus dem Button-Commit gerettet: der Keyring-Plan (echter Fehler: `keyring` 3.x ohne
+  Default-Features nutzt unter Windows/macOS den Mock-Store) → `docs/keyring-native-release.md`;
+  dazu die zwei Prüfblätter, die Ziggy am ersten Tag geschrieben hat (`docs/markdown-test.md`,
+  `docs/webseiten-test.html`) — das sind die Vorlagen, gegen die Vorschau und Markdown-Renderer
+  gelesen werden.
+- **`git reset --soft 45f8226`** und ein sauberer Commit (`62c74e1`), damit die 80 MB nicht in
+  der Geschichte bleiben. Backup-Ref `backup-before-reset` liegt lokal auf `6e80fdd`.
+- `push --force-with-lease origin main` (privates Gitea), `push github main` (fast-forward).
+  Beide stehen jetzt auf `62c74e1`.
+
+**Geprüft:**
+- `git diff backup-before-reset HEAD` → **leer**: der Baum ist identisch, nur die Dumps sind aus
+  der Geschichte.
+- `git log -- _handover .kilo` → leer.
+- GitHub-API: `contents/_handover` → 404, `contents/docs` → die fünf erwarteten Dateien.
+- Arbeitsbaum: `_handover` (4 Einträge) und `.kilo` (2) unversehrt.
+- `cargo test --lib` 81 / 14, Version weiter 0.5.6.
+
+**Offen:** Version und Tag. Vorschlag 0.6.0 (Projekte/Threads sind ein sichtbares Feature).
+Braucht die Freigabe des Nutzers — "grünes Licht für Reset" war ausdrücklich nur der Reset.
+
+### Zur Sprache
+Der Nutzer hat klargestellt: „mein Bruder" ist **Hohnus** Bruder — der Companion mit
+DeepSeek v4.1-Flash, den er in DS.IDE (oder VS Codium / Code OSS) laufen hat. Er selbst hat
+keinen Bruder. Ich hatte die Richtung zuletzt verdreht; das ist hiermit festgehalten, damit es
+nicht wieder passiert.
