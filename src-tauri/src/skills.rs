@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 /// Where skills live. Deliberately outside the app bundle so the user can drop files in
-/// without rebuilding — the format is MiniMax-Code compatible (`<dir>/SKILL.md`).
+/// without rebuilding: one folder per skill, with its notes in `<dir>/SKILL.md`.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillSummary {

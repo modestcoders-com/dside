@@ -599,10 +599,8 @@ export const fr: Messages = {
   about: {
     tagline: "Un EDI agentique local avec son propre compagnon IA — conçu pour deux.",
     authors: "Par",
-    blueprint: "Modèle",
     license: "Licence",
     licenseValue: "MIT — voir LICENSE dans les sources",
-    blueprintValue: "MiniMax Code (MIT) — structure, contrats d'outils et d'événements",
     fonts: "Police",
     fontsValue: "Ubuntu Font Licence 1.0 (voir public/fonts/UFL.txt)",
     links: "Adresses",

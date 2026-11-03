@@ -34,5 +34,5 @@ Fallback, falls diese Datei fehlt.
   macOS-spezifische Pfade werden nicht nur auf Linux geprüft.
 - Referenz-Checkouts (minimax-code-main, kilocode-main, monaco-editor-0.57.0, Ubuntu/)
   bleiben lokal und sind gitignored.
-- Lizenzhinweise: MIT; Protokollformate/Toolnamen aus MiniMax Code (MIT); Ubuntu-Font
-  unter UFL 1.0.
+- Lizenzhinweise: MIT; Ubuntu-Font unter UFL 1.0. Kein Code aus fremden Projekten — die
+  Anordnung der Fenster ist an Agenten-IDEs angelehnt, nichts ist kopiert.

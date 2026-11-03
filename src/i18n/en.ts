@@ -600,10 +600,8 @@ export const en: Messages = {
   about: {
     tagline: "A local agentic IDE with its own AI companion — built for two.",
     authors: "By",
-    blueprint: "Blueprint",
     license: "Licence",
     licenseValue: "MIT — see LICENSE in the source",
-    blueprintValue: "MiniMax Code (MIT) — structure, tool and event contracts",
     fonts: "Typeface",
     fontsValue: "Ubuntu Font Licence 1.0 (see public/fonts/UFL.txt)",
     links: "Addresses",

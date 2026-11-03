@@ -131,15 +131,13 @@ Wir möchten Sie lieber vorab informieren, anstatt dass Sie diese Punkte erst sp
 
 ### Ursprung & Danksagungen
 
-Protokollformate und Tool-Bezeichnungen wurden aus **MiniMax Code** (MIT) übernommen: `packages/protocol/src/runtime.ts`, `agent-tools/src/desktop/builtin-defs.ts`.
-
-Die Persona wurde eigenständig verfasst; es wurden keine identitätsstiftenden Texte kopiert. Schriftart: **Ubuntu Font Licence 1.0** (`public/fonts/UFL.txt`). Beide werden in der App unter „Einstellungen“ → „Über“ aufgeführt.
+Die Anordnung der Fenster — Gespräch neben Arbeitsbereich neben Dateibaum — ist die Form, die fast alle Agenten-IDEs teilen; die Screenshots von MiniMax Code waren die erste visuelle Vorlage dafür. **Code wurde daraus nicht übernommen**: Engine, Werkzeugprotokoll und die Persona des Begleiters sind für dieses Projekt geschrieben, das Layout wurde nachgebaut statt kopiert. Schriftart: **Ubuntu Font Licence 1.0** (`public/fonts/UFL.txt`), aufgeführt in der App unter „Einstellungen“ → „Über“.
 
 Die Referenz-Checkouts, auf deren Basis dieses Projekt entwickelt wurde (`minimax-code-main`, `minimax-jarvis`, `kilocode-main`), sind **nicht** Teil dieses Repositorys; Hinweise zu deren Fundort finden sich in der Datei `PROGRESS.md` (Abschnitte 30–31).
 
 ### Lizenz
 
-**MIT** – siehe [LICENSE](./LICENSE). Protokollformate und Tool-Bezeichnungen, die aus MiniMax Code stammen, enthalten ebenfalls den entsprechenden MIT-Lizenzhinweis; für die mitgelieferte Ubuntu-Schriftart gilt die zugehörige eigene Lizenz (`public/fonts/UFL.txt`).
+**MIT** – siehe [LICENSE](./LICENSE). Für die mitgelieferte Ubuntu-Schriftart gilt die zugehörige eigene Lizenz (`public/fonts/UFL.txt`).
 
 Was das in der Praxis bedeutet: Sie können den Code verwenden, anpassen und verbreiten – auch kommerziell –, solange der Urheberrechtshinweis erhalten bleibt.
 

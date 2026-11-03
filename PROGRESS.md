@@ -4257,3 +4257,62 @@ neuen Bauteil mit derselben Id. „Neu starten" behebt es; sauber wäre ein Gene
 `pty_open`. Aufgenommen für eine eigene Runde.
 
 Offen: kein Push, kein Tag — Freigabe des Nutzers steht aus.
+
+## 100. Falsche Herkunftsangabe entfernt, Archiv-Wiederherstellung repariert (2026-11-03, achtundsiebzigste Runde)
+
+### Die Zeile, die nicht stimmte
+Die About-Seite sagte unter „Vorbild": *„MiniMax Code (MIT) — Aufbau, Werkzeug- und
+Ereignisverträge"*. Der Nutzer hat das beanstandet, und er hat recht — in drei Punkten:
+
+- **„Aufbau"**: Das Layout ist die Anordnung, die fast alle Agenten-IDEs teilen (Gespräch,
+  Arbeitsbereich, Dateibaum). Vorbild waren Screenshots, kein Bauplan.
+- **„Werkzeugverträge"/„Ereignisverträge"**: keine Fachbegriffe. Ein Werkzeugvertrag ist im
+  Deutschen ein Leih- bzw. Verwahrungsvertrag für Produktionswerkzeuge; „Ereignisvertrag"
+  gibt es nicht. Gemeint war „Tool-Schema und Event-Format" — nur stand das nirgends.
+- **Und der Kern**: Es wurde **kein Code übernommen**. Das MiniMax/Mavis-System war gewünscht,
+  aber nie umgesetzt; Persona, Werkzeugprotokoll und Engine sind für dieses Projekt
+  geschrieben. Das steht so auch im Kopf von `persona.ts` — die Attributionszeile behauptete
+  trotzdem das Gegenteil.
+
+**Geändert:**
+- **About**: die Zeile „Vorbild" ist ganz weg (Panel + `about.blueprint`/`blueprintValue` aus
+  allen sechs Katalogen, 508 → 506 Schlüssel). Die Karte zeigt jetzt Lizenz und Schrift.
+- **README ×6**: der Satz „Protokollformate und Tool-Bezeichnungen wurden übernommen" samt
+  Dateipfaden ist ersetzt durch das, was stimmt — gemeinsame Anordnung, Screenshots als erste
+  visuelle Referenz, **kein kopierter Code**, Layout nachgebaut. Der Lizenzabsatz nennt nur
+  noch MIT und den Ubuntu-Font.
+- **HANDOVER** („Origins and licence") und **AGENTS.md** ebenso.
+- **Code-Kommentare**: `tools.rs` („spiegelt MiniMax' `Local*ToolDef`") und `skills.rs`
+  („MiniMax-Code compatible") beschreiben jetzt die Sache statt einer Quelle; `persona.ts`
+  sagt „nichts aus einem fremden Prompt kopiert".
+
+Die Referenz-Checkouts bleiben als Arbeitsmittel in PROGRESS.md erwähnt (sie sind gitignored),
+aber nicht mehr als Lizenzgrund. `LICENSE` bleibt MIT und unverändert — nichts, was eine
+fremde Copyright-Notiz verlangt, ist im Repo.
+
+### Zwei Fehler an der Archiv-Seite
+Der Nutzer meldete: Wiederherstellen eines archivierten Projekts „mitsamt Aufgabe"
+funktionierte nicht, obwohl der Eintrag im Archiv korrekt mit Thread- und Projektname stand.
+
+1. **`restore()` lud nur die Archivliste neu.** Die Leiste hält ihre eigene Kopie der Threads;
+   der wiederhergestellte Thread blieb draußen, bis die App neu startete. Jetzt
+   `Promise.all([loadArchived(), loadSessions()])`.
+2. **Beim direkten Öffnen der Seite auf „Archiviert" lud die Liste nie** — der Watcher auf
+   `activeItem` feuert nur bei einem Wechsel, und `openSettings("archived")` setzt den Wert
+   schon vor dem Mounten. Mit `{ immediate: true }` lädt sie jetzt beim Einhängen. Gefunden,
+   weil der Test die Seite direkt öffnete.
+
+### Geprüft
+`pnpm build` grün (506 Schlüssel, sechs Kataloge), `cargo test --lib` 76 / 14 ignoriert.
+Live (isolierte Instanz, Port 9336):
+- Thread in projA angelegt, per Kontextmenü archiviert → Projektgruppe verschwindet (erwartet,
+  Gruppen entstehen aus Threads), DB-Zeile `archived = 1`.
+- Einstellungen → Archiviert (direkt geöffnet): Eintrag „Ohne Titel · projA · 3.11.2026" mit
+  „Reaktivieren"/„Löschen" — vorher stand dort „Nichts archiviert".
+- „Reaktivieren" → Archiv leer, Leiste zeigt wieder „projA" mit dem Thread (Session-Liste
+  1 → 2).
+- About: nur noch „Lizenz" und „Schrift" in der Faktenkarte, kein „Vorbild" mehr.
+- `grep -ri minimax` findet in README/HANDOVER/AGENTS/src nur noch die bewusst neutrale
+  Erwähnung der Screenshots als visuelle Referenz.
+
+Offen: kein Push, kein Tag.

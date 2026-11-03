@@ -33,6 +33,7 @@ import { partnerDisplayName } from "../../stores/partner";
 import {
   clearApiKey,
   engineReady,
+  loadSessions,
   refreshSecret,
   saveApiKey,
   secretBackend,
@@ -292,7 +293,9 @@ async function loadArchived() {
 
 async function restore(id: string) {
   await invoke("session_archive", { id, archived: false });
-  await loadArchived();
+  // The rail keeps its own copy of the thread list. Refreshing only the archive left the
+  // restored task out of the sidebar until the app was restarted.
+  await Promise.all([loadArchived(), loadSessions()]);
 }
 
 /**
@@ -330,9 +333,15 @@ watch([archivedQuery, archivedProject], () => {
   archiveDeleteId.value = null;
 });
 
-watch(activeItem, (value) => {
-  if (value === "archived") void loadArchived();
-});
+// `immediate`: the page can open *on* this section (`openSettings("archived")`), and then
+// there is no change to react to — the list stayed empty until the app was restarted.
+watch(
+  activeItem,
+  (value) => {
+    if (value === "archived") void loadArchived();
+  },
+  { immediate: true },
+);
 </script>
 
 <template>

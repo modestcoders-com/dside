@@ -3,9 +3,8 @@ import { PARTNER_NAME_PLACEHOLDER } from "./names";
 /**
  * Persona for the DS.IDE partner.
  *
- * Written for this product. NOT copied from the MiniMax/Mavis prompt templates —
- * those stay referenced in the attribution, but their identity texts are deliberately
- * not carried over (see PROGRESS.md, section 8).
+ * Written for this product. No text from another product's prompt was copied; the
+ * identity, the work discipline and the wording are ours (see PROGRESS.md, section 8).
  */
 export interface PersonaInput {
   /** The name it chose for itself, or null while it still goes by the placeholder. */

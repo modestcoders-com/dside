@@ -597,10 +597,8 @@ export const es: Messages = {
   about: {
     tagline: "Una IDE agéntica local con su propio compañero de IA: hecha para dos.",
     authors: "Por",
-    blueprint: "Modelo",
     license: "Licencia",
     licenseValue: "MIT — ver LICENSE en el código",
-    blueprintValue: "MiniMax Code (MIT) — estructura, contratos de herramientas y eventos",
     fonts: "Tipografía",
     fontsValue: "Ubuntu Font Licence 1.0 (ver public/fonts/UFL.txt)",
     links: "Direcciones",

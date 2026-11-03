@@ -86,8 +86,8 @@
   /* Watermark behind the conversation. 1% is arithmetically invisible — this is the one
      value to turn if the mark should be stronger or softer. */
   --watermark: url("/deepseek-mark-white.png");
-  --watermark-opacity: 0.06;
-  --watermark-size: 75%;
+  --watermark-opacity: 0.01;
+  --watermark-size: 70%;
 
   /* Reading size for the conversation and the previews. The user sets this in settings;
      the default is what it always was. */

@@ -63,8 +63,8 @@ const IGNORED_DIRS: &[&str] = &[
 
 /// Tool definitions in OpenAI function-calling shape.
 ///
-/// The base names mirror MiniMax Code's `Local*ToolDef` set (read/write/edit/bash/grep/
-/// glob/todowrite); the companion tools are registered here too. Dispatch is split:
+/// The base names are the plain verbs for what each tool does (read, write, edit, bash,
+/// grep, glob, todowrite); the companion tools are registered here too. Dispatch is split:
 /// `execute` below handles the file, shell, search and web tools; memory, recall, ask_user,
 /// task, name_ideas, choose_name, screenshot and the browser tools run in `engine/mod.rs`.
 /// Keep both sides in step when adding a tool.

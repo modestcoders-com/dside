@@ -595,10 +595,8 @@ export const zhHans: Messages = {
   about: {
     tagline: "一个本地智能开发环境，拥有自己的 AI 伴侣——为两个人而做。",
     authors: "作者",
-    blueprint: "蓝本",
     license: "许可证",
     licenseValue: "MIT — 见源代码中的 LICENSE",
-    blueprintValue: "MiniMax Code（MIT）——结构、工具与事件约定",
     fonts: "字体",
     fontsValue: "Ubuntu 字体许可证 1.0（见 public/fonts/UFL.txt）",
     links: "地址",

@@ -601,10 +601,8 @@ export const de = {
   about: {
     tagline: "Eine lokale agentische IDE mit einem eigenen KI-Begleiter — gebaut für zwei.",
     authors: "Von",
-    blueprint: "Vorbild",
     license: "Lizenz",
     licenseValue: "MIT — siehe LICENSE im Quelltext",
-    blueprintValue: "MiniMax Code (MIT) — Aufbau, Werkzeug- und Ereignisverträge",
     fonts: "Schrift",
     fontsValue: "Ubuntu Font Licence 1.0 (Beilage: public/fonts/UFL.txt)",
     links: "Adressen",

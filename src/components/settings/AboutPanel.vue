@@ -83,10 +83,6 @@ onMounted(async () => {
     <div class="grid">
       <section class="card facts">
         <div class="fact">
-          <span class="label">{{ t("about.blueprint") }}</span>
-          <span class="value">{{ t("about.blueprintValue") }}</span>
-        </div>
-        <div class="fact">
           <span class="label">{{ t("about.license") }}</span>
           <span class="value">{{ t("about.licenseValue") }}</span>
         </div>

@@ -375,10 +375,12 @@ chosen, the keyring key was recognized, the diagnostics connection test returned
 
 ## Origins and licence
 
-MIT (see `LICENSE`). Protocol formats and tool names were adopted from **MiniMax Code**
-(MIT): `packages/protocol/src/runtime.ts`, `agent-tools/src/desktop/builtin-defs.ts`. The
-bundled Ubuntu font is under the Ubuntu Font Licence 1.0 (`public/fonts/UFL.txt`). The
-reference checkouts used during development are not part of the repository.
+MIT (see `LICENSE`). No code was copied from another project. The window arrangement (chat,
+work area, file tree) is the shape most agent IDEs share and MiniMax Code's screenshots were
+the first visual reference — the engine, the tool protocol and the partner's persona were
+written for this project and the layout was rebuilt. The bundled Ubuntu font is under the
+Ubuntu Font Licence 1.0 (`public/fonts/UFL.txt`). The reference checkouts used during
+development are not part of the repository and are gitignored.
 
 ## First checks for a new maintainer
 

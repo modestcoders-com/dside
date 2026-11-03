@@ -132,15 +132,13 @@ scripts/              小型工具（例如名称表导入工具）
 
 ### 起源与致谢
 
-协议格式和工具名称参考自 **MiniMax Code** (MIT 协议)：`packages/protocol/src/runtime.ts` 和 `agent-tools/src/desktop/builtin-defs.ts`。
-
-角色设定（Persona）系独立编写，未复制任何定义身份的文本。字体采用 **Ubuntu Font Licence 1.0** 协议（见 `public/fonts/UFL.txt`）。上述内容均已在应用内的“设置”→“关于”页面中注明。
+窗口布局——对话在左、工作区在右、旁边是文件树——是几乎所有智能体 IDE 共有的形态；MiniMax Code 的截图是最初的视觉参考。**未从其中复制任何代码**：引擎、工具协议和伙伴人格都是为本项目编写的，布局是重新实现而不是照搬。字体采用 **Ubuntu Font Licence 1.0** 协议（见 `public/fonts/UFL.txt`），已在应用内的“设置”→“关于”页面中注明。
 
 本项目构建所参考的代码库版本（`minimax-code-main`、`minimax-jarvis`、`kilocode-main`）**不**包含在本仓库中；获取方式请参阅 `PROGRESS.md` 的第 30–31 节。
 
 ### 许可协议
 
-采用 **MIT** 协议 — 详见 [LICENSE](./LICENSE)。源自 MiniMax Code 的协议格式和工具名称同样附带其 MIT 声明；所包含的 Ubuntu 字体则遵循其自身的许可协议（`public/fonts/UFL.txt`）。
+采用 **MIT** 协议 — 详见 [LICENSE](./LICENSE)。所包含的 Ubuntu 字体遵循其自身的许可协议（`public/fonts/UFL.txt`）。
 
 简而言之：您可以自由使用、修改及分发本项目（包括用于商业用途），但请务必保留版权声明。
 

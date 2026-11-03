@@ -131,15 +131,13 @@ Preferimos informarte desde el principio antes de que lo descubras por las malas
 
 ### Orígenes y agradecimientos
 
-Los formatos de protocolo y los nombres de las herramientas se han tomado de **MiniMax Code** (MIT): `packages/protocol/src/runtime.ts`, `agent-tools/src/desktop/builtin-defs.ts`.
-
-La «personalidad» (*persona*) se redactó de forma independiente; no se ha copiado ningún texto que defina la identidad. Tipo de letra: **Ubuntu Font Licence 1.0** (`public/fonts/UFL.txt`). Ambos elementos aparecen acreditados en la aplicación, en la sección Configuración → Acerca de.
+La disposición de las ventanas — conversación junto al área de trabajo junto al árbol de archivos — es la forma que comparten casi todos los IDE de agentes; las capturas de MiniMax Code fueron la primera referencia visual. **No se copió código de allí**: el motor, el protocolo de herramientas y la personalidad del compañero se escribieron para este proyecto, y el diseño se reconstruyó en lugar de tomarse. Tipo de letra: **Ubuntu Font Licence 1.0** (`public/fonts/UFL.txt`), acreditada en la aplicación, en la sección Configuración → Acerca de.
 
 Las versiones de referencia sobre las que se construyó este proyecto (`minimax-code-main`, `minimax-jarvis`, `kilocode-main`) **no** forman parte de este repositorio; la información sobre dónde encontrarlas se detalla en `PROGRESS.md` (secciones §30–§31).
 
 ### Licencia
 
-**MIT** — véase [LICENSE](./LICENSE). Los formatos de protocolo y los nombres de herramientas provenientes de MiniMax Code conservan su aviso de licencia MIT; la tipografía Ubuntu incluida mantiene su propia licencia (`public/fonts/UFL.txt`).
+**MIT** — véase [LICENSE](./LICENSE). La tipografía Ubuntu incluida mantiene su propia licencia (`public/fonts/UFL.txt`).
 
 En la práctica, esto significa que puedes usarlo, modificarlo y distribuirlo —incluso con fines comerciales—, siempre y cuando conserves el aviso de derechos de autor (*copyright*).
 

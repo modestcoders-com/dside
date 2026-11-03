@@ -126,12 +126,11 @@ scripts/              small tools (e.g. the name-table importer)
 
 ## Origins and acknowledgements
 
-Protocol formats and tool names were adopted from **MiniMax Code** (MIT):
-`packages/protocol/src/runtime.ts`, `agent-tools/src/desktop/builtin-defs.ts`. The persona was written independently; no identity-defining text was copied. Typeface: **Ubuntu Font Licence 1.0** (`public/fonts/UFL.txt`). Both are credited in the app under Settings → About.
+The window arrangement — chat beside a work area beside a file tree — is the shape most agent IDEs share; MiniMax Code's screenshots were the first visual reference for it. **No code was copied from it**: the engine, the tool protocol and the partner's persona were written for this project, and the layout was rebuilt rather than taken. Typeface: **Ubuntu Font Licence 1.0** (`public/fonts/UFL.txt`), credited in the app under Settings → About.
 
 The reference checkouts this project was built against (`minimax-code-main`,
 `minimax-jarvis`, `kilocode-main`) are **not** part of this repository; where to find them is recorded in PROGRESS.md §30–§31.
 
 ## Licence
 
-MIT — see [LICENSE](./LICENSE). Protocol formats and tool names that came from MiniMax Code carry their MIT notice too; the bundled Ubuntu font keeps its own licence (`public/fonts/UFL.txt`). What that means in practice: use it, change it, ship it, even commercially — just keep the copyright notice.
+MIT — see [LICENSE](./LICENSE). The bundled Ubuntu font keeps its own licence (`public/fonts/UFL.txt`). What that means in practice: use it, change it, ship it, even commercially — just keep the copyright notice.
