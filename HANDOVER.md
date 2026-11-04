@@ -4,30 +4,14 @@ This is the short handover for taking the project over. `PROGRESS.md` is the aut
 log (German, one section per round); `AGENTS.md` describes how to work in the repository.
 
 **Repository:** https://github.com/modestcoders-com/dside (moved from `moc72/dside` on
-2026-10-26; the old path redirects). `origin` is the local Gitea at 192.168.0.40.
+2026-10-26; the old path redirects).
 
-**Status:** `v0.5.1` is tagged (2026-10-29) with the two fixes from the 0.5.0 test
-(no black screenshots on Wayland, reachable file tree); its release is a draft until the user
-publishes it. `v0.5.0` (2026-10-24) is the earlier draft with preview, click, trust and the loop
-guard. Tagged with it:
-`preview` (workspace HTML/CSS in the app browser with layout data and breakpoint sizes),
-`browser_click`, `browser_windows`, permanent tool grants, the copy action, the guard that
-cuts a repeating answer, compression on the provider's own prompt size, window-only
-screenshots and the trust system that reveals the companion's name at 100 points.
+**Status:** `v0.6.0` is current. Since `v0.4.13` — the last release before the 0.5 line — the
+project gained a tool-result discipline (nothing may be reported without a tool result behind
+it), a verifier that answers fail-closed, self-reminders, paged history, the browser preview,
+projects with threads bound to their folders, and the official whale mark as an animated SVG.
 
-The working tree adds round 82 (2026-10-26), taken from the user's own fork: paged history
-for long threads, sliding side panels and archive management. The fork's companion/project
-database model is deliberately not part of DS.IDE.
-
-Round 85 fixes two bugs from the 0.5.0 test on Linux/Wayland: capture no longer accepts an X11
-tool's black picture as success (Wayland sessions only try Wayland-capable tools, and a
-uniform image is rejected), and the file tree stays reachable when no file is open.
-
-Round 83 fixes a layout bug found in real use: the document itself could scroll (WebKit
-inflated its scroll height to the length of the conversation), so a follow/reveal scroll
-shifted the whole window upwards. `html` is pinned now, the tree reveal scrolls only its own
-list, and a scroll listener keeps the root at the origin. No version bump yet; the user tests
-first.
+The five 0.5 releases were built and never published; `v0.6.0` carries their content.
 
 ## What it is
 

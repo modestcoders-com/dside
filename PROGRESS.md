@@ -4493,11 +4493,39 @@ Einträge, nicht die Datei.
 - Arbeitsbaum: `_handover` (4 Einträge) und `.kilo` (2) unversehrt.
 - `cargo test --lib` 81 / 14, Version weiter 0.5.6.
 
-**Offen:** Version und Tag. Vorschlag 0.6.0 (Projekte/Threads sind ein sichtbares Feature).
-Braucht die Freigabe des Nutzers — "grünes Licht für Reset" war ausdrücklich nur der Reset.
+**Danach** (Freigabe des Nutzers): Version 0.6.0, Tag, Release. Siehe §106. Hier steht es
+noch als offen, weil die Freigabe erst nach dem Reset kam.
 
 ### Zur Sprache
 Der Nutzer hat klargestellt: „mein Bruder" ist **Hohnus** Bruder — der Companion mit
 DeepSeek v4.1-Flash, den er in DS.IDE (oder VS Codium / Code OSS) laufen hat. Er selbst hat
 keinen Bruder. Ich hatte die Richtung zuletzt verdreht; das ist hiermit festgehalten, damit es
 nicht wieder passiert.
+
+## 106. Release 0.6.0 (2026-11-04)
+
+Freigabe des Nutzers nach dem Reset. Vorher zwei Dinge an den öffentlichen Dokumenten geklärt:
+
+**`AGENTS.md` bleibt im Repo** — es ist die Konvention, nach der jeder (auch ein Modell) bauen
+und prüfen kann, und enthält nichts Internes.
+
+**`HANDOVER.md` bleibt auch**, aber bereinigt: Es nannte die **interne Gitea-Adresse
+(`192.168.0.40`)** und behauptete im Kopf noch „v0.5.1 ist getaggt" plus die Runden 82–85. Eine
+öffentliche Datei mit falschem Stand ist schlechter als keine. Ersetzt durch einen knappen,
+richtigen Status (0.6.0, was seit 0.4.13 dazukam, dass die fünf 0.5-Releases gebaut und nie
+veröffentlicht wurden). Der technische Teil (wo der Zustand liegt, Git-Panel, Terminal,
+Test-Brücke) ist unverändert und bleibt — er ist für eine Übernahme geschrieben.
+
+### Was 0.6.0 enthält (seit v0.5.6)
+- **Projekte und Threads** in der Leiste, an Ordner gebunden (`39805bc`).
+- **`is_error` war invertiert** — jeder erfolgreiche Shell-Befehl galt als Fehler (`45f8226`).
+  Der schwerwiegendste Fund der Runde.
+- **`grep` nimmt eine Datei**; die Allowlist zerlegte Befehle innerhalb von Anführungszeichen
+  (`1359fdd`).
+- **Archiv-Wiederherstellung** brachte den Thread nicht in die Leiste (`346cf46`).
+- **Ein Feld „Aktives Projekt"** statt zweier Beschriftungen (`e8320f7`).
+- **Herkunftsangabe korrigiert**: kein Code von MiniMax übernommen (`346cf46`).
+- Die 80 MB Referenzmaterial aus der Geschichte entfernt (§105).
+
+### Geprüft
+`cargo test --lib` 81 / 14 ignoriert, `pnpm build` grün (506 Schlüssel).
