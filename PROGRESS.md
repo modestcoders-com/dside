@@ -4529,3 +4529,47 @@ Test-Brücke) ist unverändert und bleibt — er ist für eine Übernahme geschr
 
 ### Geprüft
 `cargo test --lib` 81 / 14 ignoriert, `pnpm build` grün (506 Schlüssel).
+
+## 107. Rückmeldung aus DS.IDE geprüft: zwei echte Funde, ein Bericht auf altem Stand (2026-11-05)
+
+### 1. Verdict-Parser war strenger als der Prompt — **war echt, behoben**
+Der Verifier-Prompt fordert „on its own line, exactly one of: `VERDICT: PASS`", der Parser
+suchte aber ein **nacktes** `VERDICT:` am Zeilenanfang. Ein Modell, das `**VERDICT: PASS**`
+schreibt — Fettung ist bei Sprachmodellen Reflex —, begann die Zeile mit `*`; `strip_prefix`
+griff nicht, es gab null Urteile, und `verdict_outcome` antwortete „gave no verdict". Fail-closed,
+also nicht gefährlich, aber es kostete einen Retry für einen reinen Formatierungsunterschied.
+
+**Änderung:** `strip_emphasis()` entfernt vor der Prüfung Leerraum sowie `*`, `_`, `` ` ``,
+`~`, `.`, `!`, `:` von **beiden** Enden — einmal von der Zeile, einmal vom Rest nach
+`VERDICT:`. Fett, kursiv, in Backticks, mit Punkt am Ende: alles zählt jetzt. Was **nicht**
+zählt: eine Zeile, die die Wörter nur *enthält* („My verdict: pass, I think.") und `PASS` ohne
+Präfix. Test `a_verifier_verdict_is_fail_closed` um sieben dekorierte Varianten und zwei
+Gegenproben erweitert.
+
+### 2. Widersprüchlicher Kommentar zum One-Shot — **war echt, behoben**
+`db.rs` sagte im Schema „switches itself off **after** running", `run_due_schedules` schaltet
+ihn aber **vor** dem Turn ab (at-most-once: ein Absturz dazwischen verliert die Erinnerung,
+statt sie doppelt zu feuern). Der Kommentar widersprach dem Code, den er erklären soll —
+genau das, was den Bericht in die Irre geführt hat. Beide Stellen sagen jetzt dasselbe, mit
+Verweis auf die Funktion.
+
+### 3. Die „kaputten Leerzeichen" — **nicht mehr vorhanden, nicht reproduzierbar**
+Gemeldet: `mod.rs:1455` und `:1461` mit 22/26 Leerzeichen mitten im Satz. Stand jetzt:
+
+- Im aktuellen Baum stehen die Literale mit explizitem `\` am Zeilenende; Rust schluckt damit
+  Zeilenumbruch **und** Einrückung. Gegenprobe mit `rustc` nachgebaut — die Meldung kommt als
+  ein Satz heraus: „…instruction to your future self, complete enough to act on…".
+- `v0.6.0` (der Stand, den der Nutzer fährt) enthält **null** Treffer für das Muster
+  „Text + 5 Leerzeichen + Text"; `a87fd1f` (29.10.) hatte drei solche Stellen, `b013a31`
+  (30.10.) hat sie ersetzt.
+- Auf der ganzen Platte gibt es **keine** Datei mit `future` + 10 Leerzeichen + `self` —
+  auch nicht in der Kilo-Worktree-Kopie `…/worktree-pool/ds-ide-…/shine-sodalite` und nicht in
+  peer².
+
+Der Bericht stammt also aus einem älteren Stand: entweder ein Werkzeugergebnis aus dem eigenen
+Verlauf (vor dem 30.10.) oder ein anderer Checkout. Das ist kein Vorwurf — es ist die bekannte
+Falle „Erinnerung ist ein Hinweis, kein Live-Zustand", und der Bericht hat sie selbst benannt,
+indem er zwei der drei Punkte nachgeprüft und einen korrigiert hat.
+
+**Geprüft:** `cargo test --lib` 81 / 14 ignoriert, `pnpm build` grün (506 Schlüssel).
+Kein Version-Bump, kein Tag — das ist ein Nachlauf zum 0.6.0-Release.

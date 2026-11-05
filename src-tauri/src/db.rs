@@ -119,9 +119,11 @@ CREATE TABLE IF NOT EXISTS schedules (
   last_run_at      INTEGER,
   next_run_at      INTEGER NOT NULL,
   created_at       INTEGER NOT NULL,
-  -- A one-shot reminder (check the CI in twenty minutes) switches itself off after running;
-  -- a repeating schedule keeps going. created_by separates what the user set up from what the
-  -- companion set for itself, so the companion reminders can be capped.
+  -- A one-shot reminder is stamped and switched off *before* its turn runs (at-most-once:
+  -- a crash in between loses the reminder instead of firing it twice — see
+  -- `run_due_schedules`). A repeating schedule keeps going. created_by separates what the
+  -- user set up from what the companion set for itself, so the companion reminders can be
+  -- capped.
   one_shot         INTEGER NOT NULL DEFAULT 0,
   created_by       TEXT NOT NULL DEFAULT 'user'
 );

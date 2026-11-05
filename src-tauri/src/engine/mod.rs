@@ -1257,18 +1257,29 @@ async fn preview_tool(
 }
 
 
+/// Trims whitespace and the characters models use for emphasis: `**`, `__`, backticks and
+/// stray trailing punctuation. Both ends, because `**VERDICT: PASS**` puts one on each side.
+fn strip_emphasis(value: &str) -> &str {
+    value.trim().trim_matches(|c: char| {
+        matches!(c, '*' | '_' | '`' | '~' | ' ' | '\t' | '.' | '!' | ':')
+    })
+}
+
 /// Reads the verifier's verdict. The gate is closed by default: a report without a verdict line
 /// is a failed check, not a pass with a formatting problem. A FAIL returns as a tool error so
 /// the caller cannot mistake it for a confirmation and move on.
 fn verdict_outcome(report: &str) -> tools::ToolOutcome {
     let mut verdicts: Vec<bool> = Vec::new();
     for line in report.lines() {
-        let line = line.trim();
-        // A model writing `verdict: pass` made no mistake worth failing it over; a line that
-        // merely *contains* the words still does not count, because the prefix is required.
+        // Emphasis is not a mistake, it is a habit: a model that has just written bold
+        // prose answers `**VERDICT: PASS**`. Requiring a bare line there cost a whole retry
+        // for formatting, so the markers are stripped from both ends before the prefix is
+        // checked. A line that merely *contains* the words still does not count.
+        let line = strip_emphasis(line);
+        // A model writing `verdict: pass` made no mistake worth failing it over.
         let upper = line.to_uppercase();
         if let Some(rest) = upper.strip_prefix("VERDICT:") {
-            let rest = rest.trim().trim_end_matches(['.', '!']).to_string();
+            let rest = strip_emphasis(rest).to_string();
             if rest == "PASS" {
                 verdicts.push(true);
             } else if rest == "FAIL" {
@@ -2062,6 +2073,32 @@ mod tests {
 
         let shouty = verdict_outcome("  verdict:   pass  ");
         assert!(!shouty.is_error, "case and spacing are not the point");
+
+        // Emphasis is a habit, not a mistake: bold, italic and backticked verdicts count,
+        // and so does a trailing full stop. Failing those burned a retry per turn.
+        for decorated in [
+            "**VERDICT: PASS**",
+            "**VERDICT: FAIL**",
+            "*VERDICT: PASS*",
+            "__VERDICT: FAIL__",
+            "`VERDICT: PASS`",
+            "**VERDICT: PASS**.",
+            "  **verdict: fail**  ",
+        ] {
+            let outcome = verdict_outcome(&format!("Checked two files.\n\n{decorated}"));
+            let expected = decorated.to_lowercase().contains("pass");
+            assert_eq!(
+                outcome.is_error, !expected,
+                "{decorated} should be {}: {}",
+                if expected { "PASS" } else { "FAIL" },
+                outcome.content
+            );
+        }
+
+        // Still closed where it matters: the words alone are not a verdict.
+        let prose = verdict_outcome("My verdict: pass, I think.");
+        assert!(prose.is_error, "a sentence containing the words is not a verdict line");
+        assert!(verdict_outcome("PASS").is_error);
     }
 
     /// A note written from reasoning is recalled with a marker, so a guess cannot quietly
