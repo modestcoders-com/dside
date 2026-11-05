@@ -3173,9 +3173,9 @@ mod tests {
         db.create_session("s1", "alt", "").unwrap();
         assert_eq!(db.list_sessions().unwrap()[0].workspace, "");
 
-        db.set_session_workspace("s1", "/p/tallygrip").unwrap();
+        db.set_session_workspace("s1", "/p/project").unwrap();
         let rows = db.list_sessions().unwrap();
-        assert_eq!(rows[0].workspace, "/p/tallygrip");
+        assert_eq!(rows[0].workspace, "/p/project");
         // Moving it does not rename it.
         assert_eq!(rows[0].title, "alt");
 
