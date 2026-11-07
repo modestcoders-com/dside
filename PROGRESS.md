@@ -4930,7 +4930,7 @@ Helfer. Nur eine Installation sollte gleichzeitig laufen — beide schreiben die
 `busy_timeout` halten das aus, aber zwei Fenster mit einem Gespräch sind eine Verwechslung.
 
 **Geprüft:** Der Screenshot aus dem Sandkasten zeigt das Fenster mit dem **bestehenden** Verlauf
-(Projekt „TallyGrip", der Chat über den git-Fehler) — nicht eine leere Oberfläche.
+(der bestehende Thread mit dem Chat über den git-Fehler) — nicht eine leere Oberfläche.
 
 ### „Keine Screenshots = blind"
 
