@@ -14,6 +14,7 @@ import SettingsPage from "./components/settings/SettingsPage.vue";
 import FirstRunDialog from "./components/FirstRunDialog.vue";
 import DeepSeekWhale from "./components/DeepSeekWhale.vue";
 import { deepSeekMark } from "./components/deepseek-mark";
+import { trackWindowTitle } from "./composables/useWindowTitle";
 import { firstRun } from "./stores/settings";
 import { partnerDisplayName, partnerReveal, refreshPartnerName } from "./stores/partner";
 import Icon from "./components/Icon.vue";
@@ -108,6 +109,7 @@ function pushTrayLabels(): void {
 watch(locale, pushTrayLabels);
 
 onMounted(() => {
+  trackWindowTitle();
   if (isSplash.value) {
     void finishSplash();
     return;

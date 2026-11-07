@@ -56,12 +56,18 @@ const listEl = ref<InstanceType<typeof MessageList> | null>(null);
 const following = ref(true);
 let observer: ResizeObserver | null = null;
 
+/**
+ * What can make the list taller. Reasoning is part of it: while the companion thinks, that
+ * text grows too, and a block the reader opened during the turn visibly pushes everything
+ * down — leaving it out meant the list did not follow during exactly that step.
+ */
 const messagesChanged = computed(() => {
   const list = messages.value;
   const last = list[list.length - 1];
   const tools = last?.tools ?? [];
   const toolBytes = tools.reduce((sum, tool) => sum + (tool.output?.length ?? 0), 0);
-  return `${list.length}|${last?.text.length ?? 0}|${tools.length}|${toolBytes}`;
+  const parts = last?.parts?.length ?? 0;
+  return `${list.length}|${last?.text.length ?? 0}|${last?.reasoning?.length ?? 0}|${parts}|${tools.length}|${toolBytes}`;
 });
 
 function isAtBottom(element: HTMLElement): boolean {
@@ -154,15 +160,31 @@ function queueFollow(): void {
   void nextTick(pinToBottom);
 }
 
+/** The scroll position at the previous event, to tell a reader's scroll from growth. */
+let lastTop: number | null = null;
+
 function onScroll(): void {
   const element = scrollEl.value;
   if (!element) return;
-  const ours = selfTop !== null && Math.abs(element.scrollTop - selfTop) <= 1;
+  const top = element.scrollTop;
+  const moved = lastTop !== null && Math.abs(top - lastTop) > 1;
+  lastTop = top;
+
+  const ours = selfTop !== null && Math.abs(top - selfTop) <= 1;
   if (ours) {
     // The layout may have grown after our write; while following, take the bottom again.
     if (following.value && !isAtBottom(element)) pinToBottom();
     return;
   }
+
+  // A scroll event whose position did not change is not a scroll: the content grew and the
+  // webview reported it anyway. Reading that as "the reader left the bottom" is what turned
+  // following off in the middle of an answer — and then the next line stayed below the edge.
+  if (!moved) {
+    if (following.value) pinToBottom();
+    return;
+  }
+
   following.value = isAtBottom(element);
   selfTop = null;
   // A correction is measured against the remembered line; recording the result of an

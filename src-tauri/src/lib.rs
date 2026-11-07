@@ -843,6 +843,28 @@ pub(crate) fn base64_encode(bytes: &[u8]) -> String {
     out
 }
 
+/// Puts the project into the window title. Several instances can be open at once, and the
+/// task bar lists them by title — "DS·IDE" twice tells the user nothing about which is which.
+/// A window without a project keeps the plain name.
+/// The window title for a workspace, split out so the rule is testable without a window.
+fn project_window_title(workspace: &str) -> String {
+    let trimmed = workspace.trim().trim_end_matches(['/', '\\']);
+    if trimmed.is_empty() || trimmed == "/" {
+        return "DS·IDE".to_string();
+    }
+    match trimmed.rsplit(['/', '\\']).next().filter(|name| !name.is_empty()) {
+        Some(project) => format!("DS·IDE — {project}"),
+        None => "DS·IDE".to_string(),
+    }
+}
+
+#[tauri::command]
+fn set_project_title(window: tauri::Window, workspace: String) -> Result<(), String> {
+    window
+        .set_title(&project_window_title(&workspace))
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 fn default_workspace() -> String {
     std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
@@ -1281,6 +1303,7 @@ pub fn run() {
             turn_diff,
             turn_revert,
             default_workspace,
+            set_project_title,
             engine::engine_set_config,
             engine::engine_configured,
             engine::engine_clear_session_grants,
@@ -1402,6 +1425,20 @@ mod tests {
             !backend.iter().any(|entry| entry.name.contains("dependencies")),
             "sections are not packages: {backend:?}"
         );
+    }
+
+    /// The title is what the task bar shows, and several windows can be open at once. The
+    /// rule: a project name when there is one, the plain name otherwise — and the project is
+    /// the last segment, whatever separators the platform uses.
+    #[test]
+    fn the_window_title_names_the_project() {
+        assert_eq!(project_window_title(""), "DS·IDE");
+        assert_eq!(project_window_title("   "), "DS·IDE");
+        assert_eq!(project_window_title("/"), "DS·IDE");
+        assert_eq!(project_window_title("/home/me/Projects/TallyGrip"), "DS·IDE — TallyGrip");
+        assert_eq!(project_window_title("/home/me/Projects/TallyGrip/"), "DS·IDE — TallyGrip");
+        assert_eq!(project_window_title(r"C:\work\Website"), "DS·IDE — Website");
+        assert_eq!(project_window_title("relative-folder"), "DS·IDE — relative-folder");
     }
 
     /// The project dropdown is fed from here: directories only, sorted, and a wrong base path

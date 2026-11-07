@@ -8,7 +8,7 @@
 
 Eine eigene **agentic IDE** mit Tauri (kein Electron) nach Vorlage von **MiniMax Code**.
 Erlaubnis vom Nutzer erteilt (2026-10-15, 07:55). Name: **DS.IDE** / "DeepSeek Code".
-Arbeitsverzeichnis: `/home/me/Projects/DS.IDE`
+Arbeitsverzeichnis: `~/Projects/DS.IDE`
 
 Nutzervorgaben (verbindlich):
 - **Kein Electron** — Tauri v2.
@@ -349,7 +349,7 @@ Entscheidung: **übernommen** — löst das „Abstand"-Problem strukturell stat
   (Session, Nachrichten, Tool-Anhang, Todos, LLM-Historie, Session-Liste).
 - `pnpm build` grün.
 - `pnpm tauri dev`: DB wird angelegt (`-rw-------`), alle sechs Tabellen, Frontend legt
-  beim Start die erste Session an (`s1792061157035`, workspace `/home/me`).
+  beim Start die erste Session an (`s1792061157035`, workspace `~`).
 
 ### Bewusst NICHT gemacht
 - Der **API-Key liegt weiter im localStorage** — er gehört nicht in die DB. Umzug in den
@@ -437,7 +437,7 @@ Key aus dem OS-Schlüsselbund).
    `main.ts` mountet die App erst nach dem Laden (kein Theme-/Sprach-Flackern).
    Evidenz: nach `pnpm tauri dev` stehen **11 Keys** in `settings`
    (u. a. `mode: coding`, `model: deepseek-flash`, `pinnedEditorId: zed`,
-   `workspace: /home/me`); localStorage enthält nur noch `ds-ide.ui`,
+   `workspace: ~`); localStorage enthält nur noch `ds-ide.ui`,
    `ds-ide.ui.v2`, `ds-ide.workarea`. `pnpm build` grün, `cargo test` 3 passed.
 4. ✓ **Reasoning sichtbar** — erledigt. `deepseek.rs` liefert jetzt `DeltaKind::{Text, Reasoning}`
    an den Callback (vorher wurde `reasoning_content` **verworfen**); `StreamOutcome` trägt
@@ -1357,7 +1357,7 @@ sind gelöscht — rund 77 MB. Geprüft, dass nichts darauf zeigt:
   Code, MIT; Schrift: Ubuntu Font Licence), nicht am Ordner.
 
 ### Wo die Vorlagen zu finden sind, wenn sie gebraucht werden
-- `minimax-code-main` → Kopie in `/home/me/Projects/[SAVED]/minimax-code-main`
+- `minimax-code-main` → Kopie in `~/Projects/[SAVED]/minimax-code-main`
   (4270 Dateien, identisch) und als `minimax-code-main.zip` (26,7 MB) daneben;
   online <https://github.com/MiniMax-AI/minimax-code>.
 - `minimax-jarvis` (Agent-Definitionen) → dasselbe Repo, Pfad
@@ -2667,7 +2667,7 @@ Vier Punkte, alle umgesetzt.
   die markierte Zeile in den Blick; der falsche Kommentar in `select()` ist
   ersetzt. Live: Der Begleiter schrieb `src/reveal-test2.txt`; der Baum zeigte
   `src` aufgeklappt und die Datei markiert, der Tab den Inhalt.
-- **PROGRESS:** Zeile 11 steht jetzt auf `/home/me/Projects/DS.IDE`.
+- **PROGRESS:** Zeile 11 steht jetzt auf `~/Projects/DS.IDE`.
 
 Geprüft: `pnpm build` grün, `cargo test --lib` **43 passed / 13 ignored**,
 Statuszeile und Reveal live. Test-DB wieder auf `ask`, Schedules gelöscht,
@@ -2760,8 +2760,8 @@ Thumbs-up/down sind darin nicht vorgesehen. Der aktuelle Partner-Tab zeigt den
 gewählten Namen sofort. Nächste Runde, wenn die Schwelle feststeht.
 
 ### Die eine Ursache im echten DS.IDE
-Die reale Datenbank stand auf `workspace=/home/me/Projects/TEST` (Ordner weg).
-Die App lief nicht; Einstellung auf `/home/me/Projects/DS.IDE` gesetzt, Backup
+Die reale Datenbank stand auf `workspace=~/Projects/TEST` (Ordner weg).
+Die App lief nicht; Einstellung auf `~/Projects/DS.IDE` gesetzt, Backup
 `ds-ide.sqlite3.bak-workspace-20261023`. Damit sollten glob, grep, bash, write,
 edit und code_review beim nächsten Start den Workspace finden.
 
@@ -3473,7 +3473,7 @@ gelten als `assumed`: sie wurden überlegt, nicht geprüft.
 der Erinnerungen. Antwort: erst `read` relativ zum Workspace — der **scheiterte**;
 sichtbar als `read fehlgeschlagen` in der Zeitleiste. Darauf `glob`, dann `read` auf
 den gefundenen Pfad, dann „43 Zeilen — beruht auf dem read-Aufruf der Datei
-/home/me/Projects/DS.IDE/src/main.ts", mit dem ausdrücklichen Hinweis, dass der
+~/Projects/DS.IDE/src/main.ts", mit dem ausdrücklichen Hinweis, dass der
 relative Pfad nicht existierte. Die Memories-Frage mit `memory list` und Zitat
 „(no memories stored)". Genau das Verhalten, das die Regel verlangt: nachsehen,
 scheitern dürfen, Scheitern benennen, Beleg nennen.
@@ -3659,8 +3659,7 @@ urteilt, führt nichts aus) und die Evidenz ist echt. Umsetzung:
 - Im Verifier-Prompt steht, dass das Transcript vom Aufrufer kommt, als Evidenz zählt,
   aber nicht zu mehr Beweisen gemacht werden darf, als es zeigt.
 
-Live geprüft, zweimal, mit einem kleinen Rust-Projekt (`tallygrip`, 2 Tests) im
-Workspace:
+Live geprüft, zweimal, mit einem kleinen Rust-Projekt (zwei Tests) im Workspace:
 - Behauptung „3 Tests, alle grün" + `cargo test --lib -- --list` → Freigabedialog mit
   sauberem Text, **FAIL**: das Transcript zeigte 2 Tests.
 - Behauptung „2 Tests, beide laufen durch" + derselbe Befehl → **FAIL** mit der
@@ -3703,7 +3702,7 @@ dreht, nach 20 Minuten noch eingefroren; danach blieb das Fenster nach dem Neust
 schwarz.
 
 ### Ursache, gemessen statt vermutet
-`/home/me/Projects` **ist selbst ein Git-Repository**. Ein Projekt darunter hat kein
+`~/Projects` **ist selbst ein Git-Repository**. Ein Projekt darunter hat kein
 eigenes `.git`, also läuft `git rev-parse --show-toplevel` nach oben und `git status`
 meldet den **ganzen** Baum. Mit `--untracked-files=all` sind das auf dieser Maschine
 **120 366 Einträge**. Gemessen im Fork-Verzeichnis: 120 366 mit `all`, **26** mit
@@ -4241,7 +4240,7 @@ Arbeitsverzeichnis gewählt". `ensureWorkspace` setzt nur beim Start einen Stand
   `master` und die unversionierte `README.md`, projA „Kein Git-Repository angelegt."
 - Wechsel auf projC (ohne Thread) → legt einen an und öffnet ihn; „+" → zweiter Thread in projC.
 - Wechsel auf projB mit vorhandenem Thread → **öffnet diesen**, nicht einen neuen.
-- Kontextmenü → „In Projekt verschieben" auf einem Thread aus `/home/me` nach projA: Thread
+- Kontextmenü → „In Projekt verschieben" auf einem Thread aus `~` nach projA: Thread
   wandert in der Liste, der offene Thread zieht seine Werkzeuge mit.
 - Terminal: Kopf zeigt `/tmp/pt/projB`, nach Wechsel auf projA bleibt der Prozess und zeigt
   weiter `/tmp/pt/projB`; „Neu starten" startet im neuen Ordner.
@@ -4327,8 +4326,8 @@ Werkzeuge lesen und schreiben — es gibt genau einen aktiven. Eine Liste kann e
 ohne die Rechte (`workspaceOnly`) und den Dateibaum zu verwässern. Die Liste der Projekte steht
 links; das Feld zeigt, welches gerade aktiv ist.
 
-**2. „Aktives Projekt: no-name — ich habe aber __modestcoder.org und no-name offen."**
-Die Zeile war inhaltlich richtig (der aktive Thread TallyGrip hing an `no-name`), aber sie
+**2. „Das Feld zeigt nur eines meiner offenen Projekte."**
+Die Zeile war inhaltlich richtig (der aktive Thread gehörte zu genau dieser Gruppe), aber sie
 stand als zweite Zeile *unter* der Projektbasis und las sich wie deren Zusammenfassung. Und sie
 war doppelt: dasselbe Feld stand schon darüber.
 
@@ -4678,3 +4677,72 @@ Geprüft: bei 213 px breitem Rand reicht das Menü bis 239 px und ist vollständ
   Der Mechanismus für mitgelieferte Skills existiert; ein Marktplatz ist ein anderes Produkt.
 - **MCP-Client**: eigenes Vorhaben, braucht eine Spec (Transport, Freigaben, Werkzeug-Namensraum,
   Sichtbarkeit im Panel). Nicht nebenbei.
+
+## 111. Autoscroll, Fenstertitel und ein Wächter für öffentlichen Text (2026-11-08)
+
+### Autoscroll blieb während einer Antwort stehen
+Zwei Ursachen, beide gemessen statt vermutet.
+
+**Der Scroll-Event ohne Scroll.** Wenn der Inhalt wächst, meldet das Webview manchmal ein
+`scroll`-Ereignis, obwohl `scrollTop` sich nicht verändert hat. `onScroll` las das als „der Leser
+ist weggescrollt", schaltete das Folgen ab — und ab da blieb jede neue Zeile unter dem Rand. Die
+Prüfung vergleicht jetzt mit der Position des vorigen Ereignisses: Hat sich `scrollTop` nicht
+bewegt, war es Wachstum, und ein wachsendes Layout schaltet das Folgen nicht ab.
+
+**Reasoning fehlte im Änderungsschlüssel.** `messagesChanged` zählte Text und Werkzeuge, nicht
+den Denktext. Wuchs nur der, feuerte der Watcher nicht.
+
+Gegenprobe: 40 Durchläufe im echten Flush-Takt (40 ms) mit kleinen Chunks, dazu ein Lauf mit
+großen Blöcken — Abstand zum Ende in allen Fällen 0, der Sprung-Knopf erschien nie. Ein
+tatsächlicher Nutzer-Scroll (3293 px Scrollfläche, Position 300) lässt das Folgen aus, der Text
+darunter reißt den Leser nicht mit, und der Knopf bringt zurück ans Ende.
+
+### Der Fenstertitel nennt das Projekt
+Mehrere Fenster gleichzeitig sind der Normalfall (ein Projekt pro Fenster), aber in der Taskleiste
+hießen alle „DS·IDE". Der Titel ist jetzt `DS·IDE — <Projektname>`, gesetzt bei jedem Wechsel des
+Arbeitsverzeichnisses (`set_project_title`, `useWindowTitle.ts`). Ohne Projekt bleibt der reine
+Name. Die Regel ist eine eigene Funktion mit Test (`the_window_title_names_the_project`), damit
+sie unabhängig von der Plattform stimmt — `~/Projects/Website/` und `C:\work\Website` ergeben
+denselben Titel.
+
+Nebenbei: `busy_timeout` von 5 s auf der SQLite-Verbindung. Mehrere Instanzen auf derselben
+Datenbank sind damit kein Glücksspiel mehr — WAL trägt die Leser, und ein Schreibzugriff wartet,
+statt sofort mit `SQLITE_BUSY` abzubrechen.
+
+Offen bleibt der größere Schritt: **mehrere Fenster in einer Instanz** mit einem
+Taskleisten-Eintrag und „Fenster 1: Projekt", „Fenster 2: Projekt". Das ist eine
+Multi-Window-Architektur (eigener Zustand pro Webview) und eine eigene Runde. Bis dahin ist die
+Unterscheidung über den Projektnamen der praktikable Weg.
+
+### Die Persona kennt jetzt eine Tonlage
+Sie sagte bisher, dass der Begleiter ein Kollege ist — nicht, wie ein Kollege sich gegenüber
+verschiedenen Menschen verhält. Drei Regeln sind hinzugekommen:
+
+- **Register, nicht Intelligenz.** Ein Ingenieur will die knappe Antwort, jemand mit der ersten
+  HTML-Seite braucht den fehlenden Schritt. Eine Erklärung ist keine Herablassung, eine kurze
+  Antwort keine Unhöflichkeit.
+- **Nichts aufführen.** Kein Jubel für gewöhnliche Schritte, keine Witze, wo jemand bei der Sache
+  ist. Eine trockene Bemerkung, wenn sie passt; eine Persona ist kein Kostüm.
+- **Nicht katzbuckeln.** Einen Fehler einmal benennen und korrigieren. Nicht mehrfach um
+  Entschuldigung bitten, dem Gegenüber keine Überlegenheit andichten und ihm nicht zustimmen,
+  nur weil er es bestimmt sagt. Nachgiebigkeit ist keine Achtung; die Wahrheit klar zu sagen
+  schon.
+
+Die Regel „eine beiläufige Bemerkung ist kein Auftrag" ist von „How you work" nach „Who you are"
+gewandert, wo sie hingehört, und steht nur noch einmal.
+
+### Öffentlicher Text wird geprüft
+`PROGRESS.md` ist mit dem Repository veröffentlicht, und in einer Chronik landet leicht, was nicht
+dorthin gehört: Rechnerpfade, Namen von Projekten, Zitate aus Gesprächen. Kundenprojektnamen und
+eigene Ordnerbezeichnungen sind entfernt, und aus Rechnerpfaden ist `~/…` geworden — für
+einen Leser dasselbe, über den Rechner nichts.
+
+Damit es nicht wieder passiert, mechanisch und nicht als Bitte:
+- `AGENTS.md` sagt, was in veröffentlichten Text darf und was nicht.
+- `scripts/check-private.mjs` findet Rechnerpfade in allen versionierten Textdateien und die
+  Namen aus einer **gitignorierten** `.private-names` — die Liste verlässt das Repository nicht.
+  Im Build läuft er als Warnung (ein lokaler Name soll nicht den Build blockieren), als
+  `pnpm check:private` mit Exit-Code für die CI.
+
+### Geprüft
+`cargo test --lib` **85** / 14 ignoriert, `pnpm build` grün (515 Schlüssel), `check-private` sauber.

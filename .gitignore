@@ -41,3 +41,6 @@ Ubuntu/
 # Local secrets fallback (the key belongs in the OS keyring)
 src-tauri/secrets.json
 
+
+# Local list for scripts/check-private.mjs — never published
+.private-names

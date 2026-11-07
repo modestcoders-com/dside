@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-i18n.mjs && vue-tsc --noEmit && vite build",
+    "build": "node scripts/check-i18n.mjs && node scripts/check-private.mjs --warn && vue-tsc --noEmit && vite build",
     "check:i18n": "node scripts/check-i18n.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "check:private": "node scripts/check-private.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

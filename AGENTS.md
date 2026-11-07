@@ -25,6 +25,12 @@ Fallback, falls diese Datei fehlt.
 
 - **PROGRESS.md ist die verbindliche Chronik.** Jede Runde bekommt einen Abschnitt mit
   Ursache, Änderung, Prüfung und dem, was offen bleibt. README ist die kurze Außenseite.
+- **`PROGRESS.md` ist öffentlich.** Das Repository ist es auch, und alles darin ist
+  veröffentlichter Text. Deshalb stehen dort technische Sachverhalte — keine Namen von
+  Kundenprojekten, keine Pfade aus dem Rechner des Autors (`~/…` genügt), keine Zitate aus
+  Gesprächen und nichts, was eine Person betrifft, die der Leser nicht kennt. Was der Nutzer
+  über sich oder seine Arbeit erzählt, ist Material für das Gedächtnis des Begleiters, nicht
+  für das Repository. `scripts/check-private.mjs` prüft das im Build.
 - **Keine Secrets ins Repo.** Der API-Key liegt im OS-Schlüsselbund; `secrets.json` ist
   nur der 0600-Fallback und gitignored.
 - **Schreibzugriffe sind nachvollziehbar.** Vor `write`/`edit` wird der alte Stand in

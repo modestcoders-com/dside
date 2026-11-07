@@ -517,6 +517,11 @@ impl Db {
             std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
         let conn = Connection::open(path).map_err(|error| error.to_string())?;
+        // Two instances can be open at once (the user starts a second window for another
+        // project). WAL handles concurrent readers; without a busy timeout a writer that finds
+        // the lock taken fails at once instead of waiting the few milliseconds it needs.
+        conn.busy_timeout(std::time::Duration::from_secs(5))
+            .map_err(|error| error.to_string())?;
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
             .map_err(|error| error.to_string())?;
         conn.execute_batch(SCHEMA).map_err(|error| error.to_string())?;
