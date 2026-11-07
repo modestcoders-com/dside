@@ -4750,3 +4750,42 @@ Damit es nicht wieder passiert, mechanisch und nicht als Bitte:
 ## Version
 0.6.1 — Patch: Autoscroll, Fenstertitel, Tonlage, Textwächter. Die vier Punkte stehen in den
 Release-Notizen; kein neues Feature, keine Änderung an der Datenbank außer dem busy_timeout.
+
+## 112. Das abgelaufene Rückfrage-Fenster aß die getippte Antwort (2026-11-08)
+
+Gemeldet: Nach mehr als fünf Minuten Schreibzeit war der Text beim Absenden weg und kam beim
+Begleiter nie an. Drei Ursachen, die zusammen genau dieses Verhalten ergeben.
+
+### 1. Der Absender blieb nach der Frist stehen
+`ask_user` wartet 300 s auf eine Antwort und gab bei Zeitablauf einen Fehler zurück — der
+Eintrag in `EngineState.pending` blieb aber liegen. Eine späte Antwort fand ihn, `engine_answer`
+meldete **Erfolg**, und der Text ging in einen Empfänger, den niemand mehr abholte. Genau das
+gemeldete Symptom: gesendet, weg, nichts passiert. Beide Wartestellen (Frage und
+Berechtigungsfreigabe) räumen den Eintrag jetzt selbst auf; eine späte Antwort bekommt einen
+klaren Fehler statt eines falschen Erfolgs. Die Frist ist eine Konstante (`ASK_TIMEOUT`), damit
+die Meldung nicht lügt, wenn sie sich ändert.
+
+### 2. Das Feld wurde vor dem Senden geleert
+`submitFree` setzte den Text auf leer und rief danach `answer()` — das bei fehlender Frage still
+zurückkehrte. Jetzt wird erst gesendet und **nur bei Erfolg** geleert. Scheitert es, bleibt der
+Satz im Feld stehen.
+
+### 3. Niemand sagte, dass es eine Frist gibt
+Kein Countdown, keine Meldung. Die Karte zeigt jetzt „läuft ab in 5:00", zählt sichtbar herunter
+und färbt sich in der letzten Minute. Scheitert das Senden, steht darunter der Grund und daneben
+**„Als Nachricht übernehmen"**: der Text wandert ins Eingabefeld (`Composer.setDraft`) statt in
+den Papierkorb — er war ja ein Satz, den jemand schreiben wollte.
+
+### Geprüft
+`cargo test --lib` 85 / 14 ignoriert, `pnpm build` grün (518 Schlüssel).
+Live gegen eine Frage, deren Frist auf der Engine-Seite schon abgelaufen war:
+- Senden → Fehlertext „Die Frage ist abgelaufen … Dein Text steht noch im Feld", der Text steht
+  unverändert im Feld, der Knopf „Als Nachricht übernehmen" erscheint.
+- Knopf → der Satz steht im Eingabefeld, das Feld der Karte ist leer, der Fokus liegt im
+  Eingabefeld.
+- Countdown tickt messbar (5:00 → 4:58 nach 2,2 s) und steht rechts neben dem Titel.
+- Am Turn-Ende verschwindet die Karte.
+
+### Offen
+Die Frist selbst ist nicht einstellbar. Fünf Minuten sind eine Setzung; wenn sich zeigt, dass
+sie zu kurz ist, gehört sie in die Einstellungen statt in eine Konstante.

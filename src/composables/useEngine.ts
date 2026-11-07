@@ -597,10 +597,16 @@ export async function abortTurn(): Promise<void> {
   await invoke("engine_abort", { sessionId: activeSessionId.value });
 }
 
-/** Answer a pending question so the blocked turn can continue. */
+/**
+ * Answer a pending question so the blocked turn can continue.
+ *
+ * Throws when the answer did not arrive — the question can have expired on the engine side,
+ * and saying "sent" while it went nowhere is how a typed answer disappears. The caller keeps
+ * the text and tells the user; the card stays until a real answer or the end of the turn.
+ */
 export async function answerAction(actionId: string, answer: string): Promise<void> {
-  pendingAction.value = null;
   await invoke("engine_answer", { actionId, answer });
+  pendingAction.value = null;
 }
 
 export async function resetConversation(): Promise<void> {

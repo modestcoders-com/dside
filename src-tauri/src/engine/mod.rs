@@ -1100,15 +1100,30 @@ async fn ask_user(
     });
     emit(app, event);
 
-    match tokio::time::timeout(std::time::Duration::from_secs(300), receiver).await {
+    let outcome = match tokio::time::timeout(ASK_TIMEOUT, receiver).await {
         Ok(Ok(answer)) => tools::ToolOutcome::ok(answer),
         Ok(Err(_)) => tools::ToolOutcome::err("ask_user: the question was dropped"),
-        Err(_) => tools::ToolOutcome::err("ask_user: no answer within 5 minutes"),
+        Err(_) => tools::ToolOutcome::err(format!(
+            "ask_user: no answer within {} minutes. The question has expired — ask again if the \
+             answer is still needed.",
+            ASK_TIMEOUT.as_secs() / 60
+        )),
+    };
+    // The sender must not outlive the wait. Leaving it in the map made a late answer look
+    // accepted: `engine_answer` found an entry, reported success, and the text went into a
+    // receiver nobody was listening to. Removed here, a late answer gets a clear error instead.
+    if let Ok(mut pending) = app.state::<EngineState>().pending.lock() {
+        pending.remove(&action_id);
     }
+    outcome
 }
 
 /// Tools that need the user's explicit approval in "ask" mode. The sub-agent is a separate
 /// story: it cannot ask, so its own write/edit/bash calls stay denied unless full access is on.
+/// How long a question waits for an answer before the turn gives up. Long enough for someone
+/// who stepped away, short enough that a forgotten question does not hang the turn forever.
+const ASK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+
 fn requires_approval(name: &str) -> bool {
     matches!(name, "write" | "edit" | "bash")
 }
@@ -1498,14 +1513,14 @@ async fn approve_tool(
     options.push("deny".to_string());
     let mut event = EngineEvent::new(session_id, *seq, "action_required");
     event.action = Some(ActionEvent {
-        id: action_id,
+        id: action_id.clone(),
         kind: "permission".to_string(),
         question: permission_summary(name, args),
         options,
     });
     emit(app, event);
 
-    match tokio::time::timeout(std::time::Duration::from_secs(300), receiver).await {
+    let decision = match tokio::time::timeout(ASK_TIMEOUT, receiver).await {
         Ok(Ok(answer)) => {
             if answer == "always" {
                 if let Some(db) = app.try_state::<Db>() {
@@ -1524,7 +1539,13 @@ async fn approve_tool(
             }
         }
         _ => false,
+    };
+    // Same reason as the question above: an entry left behind makes a late approval look
+    // accepted while it goes nowhere.
+    if let Ok(mut pending) = app.state::<EngineState>().pending.lock() {
+        pending.remove(&action_id);
     }
+    decision
 }
 
 fn has_session_grant(app: &AppHandle, session_id: &str) -> bool {

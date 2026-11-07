@@ -307,6 +307,9 @@ export const es: Messages = {
     title: "Pregunta",
     placeholder: "Escribir respuesta…",
     send: "Responder",
+    expiresIn: "caduca en {time}",
+    expired: "La pregunta ha caducado: la respuesta ya no llegó. Tu texto sigue en el campo.",
+    keepText: "Conservar como mensaje",
   },
   engine: {
     needsKey: "No hay API-Key — añádelo en Configuración → Uso y modelo.",

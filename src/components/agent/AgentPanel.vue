@@ -37,18 +37,70 @@ watch(running, (isRunning) => {
 });
 
 const freeAnswer = ref("");
+/**
+ * The engine gives a question five minutes, and the UI said nothing about it — someone who
+ * steps away for a moment comes back to a card that is already dead. The countdown makes the
+ * deadline visible before it matters.
+ */
+const ASK_SECONDS = 300;
+const secondsLeft = ref(ASK_SECONDS);
+let askTimer: number | undefined;
 
-async function answer(option: string) {
+function startCountdown(): void {
+  window.clearInterval(askTimer);
+  secondsLeft.value = ASK_SECONDS;
+  askTimer = window.setInterval(() => {
+    secondsLeft.value = Math.max(0, secondsLeft.value - 1);
+    if (secondsLeft.value === 0) window.clearInterval(askTimer);
+  }, 1000);
+}
+
+watch(pendingAction, (action) => {
+  answerError.value = null;
+  if (action) startCountdown();
+  else window.clearInterval(askTimer);
+});
+
+const countdownLabel = computed(() => {
+  const left = secondsLeft.value;
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
+});
+/** What went wrong with the last answer attempt, shown in the card until the next try. */
+const answerError = ref<string | null>(null);
+
+/**
+ * Sends an answer and keeps the text until it is known to have arrived. The engine gives a
+ * question five minutes; after that the text used to vanish silently — typed, sent, gone.
+ */
+async function answer(option: string): Promise<boolean> {
   const action = pendingAction.value;
-  if (!action) return;
-  await answerAction(action.id, option);
+  if (!action) return false;
+  answerError.value = null;
+  try {
+    await answerAction(action.id, option);
+    return true;
+  } catch (cause) {
+    answerError.value = String(cause);
+    return false;
+  }
 }
 
 async function submitFree() {
   const text = freeAnswer.value.trim();
   if (!text) return;
+  const delivered = await answer(text);
+  // Cleared only on success: a failed send keeps the sentence in the field, where it can be
+  // sent again — or moved to the composer — instead of being lost.
+  if (delivered) freeAnswer.value = "";
+}
+
+/** Takes the typed answer out of the expired card and into the composer. */
+function keepAnswerAsMessage(): void {
+  const text = freeAnswer.value.trim();
+  if (!text) return;
+  composer.value?.setDraft(text);
   freeAnswer.value = "";
-  await answer(text);
+  answerError.value = null;
 }
 
 const scrollEl = ref<HTMLElement | null>(null);
@@ -278,6 +330,7 @@ function onWindowResize(): void {
 onBeforeUnmount(() => {
   observer?.disconnect();
   observer = null;
+  window.clearInterval(askTimer);
   window.removeEventListener("resize", onWindowResize);
 });
 </script>
@@ -314,6 +367,9 @@ onBeforeUnmount(() => {
             ? t("permission.requestTitle")
             : t("question.title")
         }}</span>
+        <span class="question-timer" :class="{ soon: secondsLeft <= 60 }">
+          {{ t("question.expiresIn", { time: countdownLabel }) }}
+        </span>
       </div>
       <p
         class="question-text"
@@ -361,6 +417,17 @@ onBeforeUnmount(() => {
           <input v-model="freeAnswer" :placeholder="t('question.placeholder')" />
           <button type="submit" :disabled="!freeAnswer.trim()">{{ t("question.send") }}</button>
         </form>
+        <p v-if="answerError" class="question-error">
+          {{ t("question.expired") }}
+          <button
+            v-if="freeAnswer.trim()"
+            class="keep-answer"
+            type="button"
+            @click="keepAnswerAsMessage"
+          >
+            {{ t("question.keepText") }}
+          </button>
+        </p>
       </template>
     </section>
 
@@ -491,6 +558,44 @@ onBeforeUnmount(() => {
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.question-timer {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.question-timer.soon {
+  color: var(--danger);
+}
+
+.question-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.keep-answer {
+  padding: 3px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+}
+
+.keep-answer:hover {
+  border-color: var(--accent);
+  color: var(--text-strong);
 }
 
 .question-note {

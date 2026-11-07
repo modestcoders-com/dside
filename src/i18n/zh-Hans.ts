@@ -304,6 +304,9 @@ export const zhHans: Messages = {
     title: "追问",
     placeholder: "输入回答…",
     send: "回答",
+    expiresIn: "{time} 后过期",
+    expired: "问题已过期 —— 回答没有送达。你的文字仍在输入框中。",
+    keepText: "保留为消息",
   },
   engine: {
     needsKey: "未设置 API Key — 请在设置 → 使用与模型中输入。",

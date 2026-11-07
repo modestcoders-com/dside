@@ -305,6 +305,9 @@ export const fr: Messages = {
     title: "Question",
     placeholder: "Réponse entrée…",
     send: "Répondre",
+    expiresIn: "expire dans {time}",
+    expired: "La question a expiré — la réponse n'est pas arrivée. Votre texte est toujours dans le champ.",
+    keepText: "Garder comme message",
   },
   engine: {
     needsKey:

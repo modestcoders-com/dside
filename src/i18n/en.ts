@@ -306,6 +306,9 @@ export const en: Messages = {
     title: "Question",
     placeholder: "Type an answer…",
     send: "Answer",
+    expiresIn: "expires in {time}",
+    expired: "The question has expired — your answer did not arrive. Your text is still in the field.",
+    keepText: "Keep as a message",
   },
   engine: {
     needsKey: "No API key set — add it in Settings → Usage & model.",

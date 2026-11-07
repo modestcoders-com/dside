@@ -306,6 +306,9 @@ export const de = {
     title: "Rückfrage",
     placeholder: "Antwort eingeben…",
     send: "Antworten",
+    expiresIn: "läuft ab in {time}",
+    expired: "Die Frage ist abgelaufen — die Antwort kam nicht mehr an. Dein Text steht noch im Feld.",
+    keepText: "Als Nachricht übernehmen",
   },
   engine: {
     needsKey:

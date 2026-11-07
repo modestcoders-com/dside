@@ -140,7 +140,19 @@ function focusComposer(): void {
   box.value?.focus();
 }
 
-defineExpose({ focus: focusComposer });
+/**
+ * Puts text into the field from outside — the chat panel uses it when an answer card expires:
+ * a sentence someone typed belongs in the next message, not in the bin.
+ */
+function setDraft(value: string): void {
+  text.value = value;
+  void nextTick(() => {
+    autoGrow();
+    box.value?.focus();
+  });
+}
+
+defineExpose({ focus: focusComposer, setDraft });
 
 interface PendingAttachment {
   path: string;
