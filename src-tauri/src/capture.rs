@@ -281,14 +281,17 @@ fn capture_to(path: &Path) -> Result<(), String> {
         // the app's terminal and claim a failure that did not happen — the screenshot was
         // taken by the tool after it. Only the first successful tool is worth a log line.
         let _ = fs::remove_file(path);
-        let Ok(status) = Command::new(program)
+        let mut command = Command::new(program);
+        command
             .args(args)
             .arg(path)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-        else {
+            .stderr(Stdio::null());
+        // ImageMagick reads ARGV0 as its program name and a bundled LD_LIBRARY_PATH breaks it
+        // with libraries that are not the system's. See `child_env`.
+        crate::child_env::sanitize(&mut command);
+        let Ok(status) = command.status() else {
             return Attempt::Failed;
         };
         let written = status.success()

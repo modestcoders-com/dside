@@ -1228,6 +1228,9 @@ pub(crate) async fn run_shell_command(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    // The companion's shell runs system programs; a bundled LD_LIBRARY_PATH breaks them the
+    // same way it breaks git. See `child_env`.
+    crate::child_env::sanitize_async(&mut shell);
 
     let child = shell.spawn().map_err(|error| error.to_string())?;
     let output = match tokio::time::timeout(Duration::from_millis(timeout_ms), child.wait_with_output())

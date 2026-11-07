@@ -53,6 +53,9 @@ async fn run_git_output(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true);
+    // A bundled library path makes the system git load libraries that do not match its own
+    // libcurl — `git push` over HTTPS then dies on a missing symbol. See `child_env`.
+    crate::child_env::sanitize_async(&mut command);
 
     #[cfg(windows)]
     {

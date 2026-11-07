@@ -7,6 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 mod browser;
 mod capture;
+mod child_env;
 mod db;
 mod engine;
 mod git_panel;

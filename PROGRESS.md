@@ -4789,3 +4789,60 @@ Live gegen eine Frage, deren Frist auf der Engine-Seite schon abgelaufen war:
 ### Offen
 Die Frist selbst ist nicht einstellbar. Fünf Minuten sind eine Setzung; wenn sich zeigt, dass
 sie zu kurz ist, gehört sie in die Einstellungen statt in eine Konstante.
+
+## 113. Im AppImage brach jeder HTTPS-Zugriff von git (2026-11-08)
+
+Gemeldet aus DS.IDE, und es betrifft jeden, der die AppImage benutzt:
+
+```text
+git-remote-https: symbol lookup error: /usr/lib/libcurl.so.4:
+undefined symbol: nghttp2_option_set_no_rfc9113_leading_and_trailing_ws_validation
+```
+
+### Ursache, gemessen
+Die AppImage setzt `LD_LIBRARY_PATH` auf ihr eigenes `usr/lib` und bundelt dort
+`libnghttp2.so.14`. Für die App selbst ist das richtig — für jedes gestartete Programm falsch:
+Das System-`git` lädt die gebundelte `libnghttp2` in die System-`libcurl`, und `git push` über
+HTTPS stirbt an einem fehlenden Symbol. Nachgewiesen in drei Schritten:
+
+1. `git ls-remote https://…` mit sauberer Umgebung: funktioniert.
+2. Derselbe Aufruf mit `LD_LIBRARY_PATH` auf das gebundelte Verzeichnis: **genau** dieser Fehler.
+3. `/proc/<pid>/environ` der laufenden AppImage: `LD_LIBRARY_PATH=/tmp/.mount_…/usr/lib/…`.
+
+Betroffen waren **alle** Stellen, an denen die App ein Systemprogramm startet: das Git-Panel,
+das `bash`-Werkzeug (und damit `verify` mit Kommando), das Terminal der IDE. Dazu `ARGV0`:
+Die AppImage setzt ihn auf ihren eigenen Pfad, und ImageMagick liest ihn als Programmnamen —
+deshalb scheiterten Screenshots und `magick` in gepackten Builds.
+
+### Änderung
+`src-tauri/src/child_env.rs` bereinigt die Umgebung für Kindprozesse:
+- `LD_LIBRARY_PATH` verliert die Einträge des Bundles (`APPDIR` **oder** die Mount-Konvention
+  `/tmp/.mount_…`). Einträge des Nutzers bleiben; bleibt nichts übrig, wird die Variable
+  entfernt.
+- `ARGV0`, `APPIMAGE`, `APPDIR`, `OWD` werden entfernt — für ein Kind bedeuten sie nichts und
+  stiften Verwirrung.
+- Eine Operationsliste (`environment_for`) wird von `sanitize` (std::process) und
+  `sanitize_async` (tokio::process) geteilt, damit die beiden Typen nicht auseinanderlaufen.
+
+Eingehängt an vier Stellen: `git_panel` (jedes git-Kommando), `engine::tools` (`bash` und
+`verify`), `pty` (Terminal der IDE), `capture` (Screenshot-Werkzeuge).
+
+### Geprüft
+`cargo test --lib` **89** / 14 ignoriert (vier neue Tests: Bundle-Pfade werden entfernt,
+Nutzer-Pfade bleiben, Präfix-Ähnlichkeit täuscht nicht, die Mount-Konvention greift auch ohne
+`APPDIR`).
+
+Der entscheidende Test mit einer **Debug-AppImage** (die Testbrücke gibt es nur dort) — also im
+echten Packprogramm mit echtem `LD_LIBRARY_PATH`:
+- `git_panel_pull` gegen ein GitHub-Repository über HTTPS: **holt Branches und Tags**, kein
+  Symbolfehler. Vorher brach genau dieser Aufruf ab.
+- Terminal der AppImage: `git ls-remote` über HTTPS liefert die Ref, und `magick -version`
+  funktioniert; `ARGV0` ist im Kind leer.
+
+Ein Stolperstein, der im Text bleiben soll: Der **Debug-Build** lässt sich mit dieser
+Umgebung nicht starten — `libsoup` bricht an derselben Bibliothek. Nur ein gepacktes Programm
+ist ein ehrlicher Test für ein Packproblem.
+
+### Offen
+0.6.1 ist veröffentlicht und enthält den Fehler. Der Fix ist committet; ein Patch-Release
+(0.6.2) braucht die Freigabe des Nutzers.

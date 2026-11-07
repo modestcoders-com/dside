@@ -69,7 +69,18 @@ fn shell() -> CommandBuilder {
     #[cfg(not(windows))]
     {
         let program = std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string());
-        CommandBuilder::new(program)
+        let mut cmd = CommandBuilder::new(program);
+        // The shell runs system programs: `git push` from here would otherwise load the
+        // bundle's libnghttp2 into the system libcurl and fail. See `child_env`.
+        if let Some(path) = crate::child_env::sanitized_library_path() {
+            cmd.env("LD_LIBRARY_PATH", path);
+        } else {
+            cmd.env_remove("LD_LIBRARY_PATH");
+        }
+        cmd.env_remove("ARGV0");
+        cmd.env_remove("APPIMAGE");
+        cmd.env_remove("APPDIR");
+        cmd
     }
 }
 
