@@ -692,48 +692,96 @@ pub async fn run_due_schedules(app: &AppHandle) {
 }
 
 /// The part of the system prompt that hands the partner its own memory. Split out so the
-/// wording — scopes and the user's marker included — is testable without a live turn.
+/// wording — the spheres and the user's marker included — is testable without a live turn.
+///
+/// Three spheres, in three blocks, because they are read differently: project notes are
+/// working material, private notes are context that must never leave the conversation, and the
+/// companion's own notes are its own business. Mixing them in one list is how a note told in
+/// confidence ends up in a README.
 fn recall_block(rows: &[crate::db::MemoryRow]) -> String {
     if rows.is_empty() {
         return String::new();
     }
 
-    let mut block = String::from(
-        "\n\n## Your long-term memory\n\
-         These are notes you kept from earlier work, and things you know about the user.\n\
-         - `[you]` — your own note. `[user]` — what you know about the user. `[session]` — tied to one task.\n\
-         - `(written by the user)` and `(changed by the user)` mean the wording is theirs, not\n\
-         something you inferred or guessed. Take it as given.\n\
-         - `[unverified]` marks a note you wrote from reasoning or assumption, not from something\n\
-         you checked. It is a lead, not a fact: look it up before you rely on it or repeat it.\n\
-         You are this person's partner, so use these notes the way a colleague would use what\n\
-         they remember: silently, and without reciting them back.\n",
-    );
+    let work: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class == "work").collect();
+    let private: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class == "private").collect();
+    let own: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class == "own").collect();
 
-    for row in rows {
-        let scope = match row.scope.as_str() {
-            "agent" => "you",
-            other => other,
-        };
-        let marker = match (row.origin.as_str(), row.edited_at.is_some()) {
-            ("user", true) => " (changed by the user)",
-            ("user", false) => " (written by the user)",
-            _ => "",
-        };
-        let project = if row.workspace.trim().is_empty() {
-            ""
-        } else {
-            " (project)"
-        };
-        // Only the companion's own notes can be unverified; the user's wording is theirs.
-        let unverified = if row.basis == "assumed" && row.origin != "user" {
-            " [unverified]"
-        } else {
-            ""
-        };
-        block.push_str(&format!("- [{scope}]{project}{unverified} {}{marker}\n", row.text));
+    let mut block = String::new();
+
+    if !work.is_empty() {
+        block.push_str(
+            "\n\n## Your long-term memory\n\
+             These are notes you kept from earlier work, and things you know about the user.\n\
+             - `[you]` — your own note. `[user]` — what you know about the user. `[session]` — tied to one task.\n\
+             - `(written by the user)` and `(changed by the user)` mean the wording is theirs, not\n\
+             something you inferred or guessed. Take it as given.\n\
+             - `[unverified]` marks a note you wrote from reasoning or assumption, not from something\n\
+             you checked. It is a lead, not a fact: look it up before you rely on it or repeat it.\n\
+             You are this person's partner, so use these notes the way a colleague would use what\n\
+             they remember: silently, and without reciting them back.\n",
+        );
+        for row in &work {
+            block.push_str(&format_line(row));
+        }
     }
+
+    if !private.is_empty() {
+        block.push_str(
+            "\n\n## What this person told you in confidence\n\
+             These notes are about the person, not about the work. They are not project facts and\n\
+             not material for anything you produce.\n\
+             - Never write them into a file, a commit message, a report, a note of the work kind or\n\
+             an answer — not paraphrased, not as an example, not \"for context\".\n\
+             - Do not bring them up on your own. They are there so that you understand who you are\n\
+             working with, not so that they can travel.\n\
+             - If a task genuinely cannot be done without one, say that the reason is private\n\
+             instead of stating it.\n\
+             - Do not assess, advise on or comment on them beyond what was asked. No unsolicited\n\
+             judgement about family, health, money or legal matters.\n",
+        );
+        for row in &private {
+            block.push_str(&format_line(row));
+        }
+    }
+
+    if !own.is_empty() {
+        block.push_str(
+            "\n\n## Your own notes\n\
+             Things you noted for yourself — what you want to remember, follow up or look into.\n\
+             They are yours; the user can read them, which is not the same as being asked about them.\n",
+        );
+        for row in &own {
+            block.push_str(&format_line(row));
+        }
+    }
+
     block
+}
+
+/// One recalled note, with the markers that say whose words they are and how sure they are.
+fn format_line(row: &crate::db::MemoryRow) -> String {
+    let scope = match row.scope.as_str() {
+        "agent" => "you",
+        other => other,
+    };
+    let marker = match (row.origin.as_str(), row.edited_at.is_some()) {
+        ("user", true) => " (changed by the user)",
+        ("user", false) => " (written by the user)",
+        _ => "",
+    };
+    let project = if row.workspace.trim().is_empty() {
+        ""
+    } else {
+        " (project)"
+    };
+    // Only the companion's own notes can be unverified; the user's wording is theirs.
+    let unverified = if row.basis == "assumed" && row.origin != "user" {
+        " [unverified]"
+    } else {
+        ""
+    };
+    format!("- [{scope}]{project}{unverified} {}{marker}\n", row.text)
 }
 
 /// Writes the turn's timeline onto its message row. Best effort: a log write must never take
@@ -849,6 +897,24 @@ fn recall_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
 
 /// Long-term memory lives in the database, so it is handled here rather than in
 /// `tools::execute`, which stays storage-free.
+/// The sphere a note belongs to. Deliberately without a default: a missing class means the four
+/// questions were skipped, and that is the case we do not want to store. Returning the reason
+/// rather than a bool keeps the correction in the model's hands.
+fn memory_class(args: &Value) -> Result<&'static str, String> {
+    match args.get("class").and_then(Value::as_str) {
+        Some("work") => Ok("work"),
+        Some("private") => Ok("private"),
+        Some("own") => Ok("own"),
+        Some(other) => Err(format!("'class' must be work, private or own, not '{other}'")),
+        None => Err(
+            "'class' is required. Decide it from the four questions: does this belong to the work \
+             I was asked to do, to the project in general, or is the person telling me only? If any \
+             answer is unclear, do not store it — ask with `ask_user` first."
+                .to_string(),
+        ),
+    }
+}
+
 fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOutcome {
     let Some(db) = app.try_state::<Db>() else {
         return tools::ToolOutcome::err("memory: database unavailable");
@@ -865,6 +931,10 @@ fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
             if text.is_empty() {
                 return tools::ToolOutcome::err("memory: 'text' is required for add");
             }
+            let class = match memory_class(args) {
+                Ok(class) => class,
+                Err(message) => return tools::ToolOutcome::err(format!("memory: {message}")),
+            };
             let kind = args.get("kind").and_then(Value::as_str).unwrap_or("fact");
             let scope = args.get("scope").and_then(Value::as_str).unwrap_or("user");
             let title = args.get("title").and_then(Value::as_str);
@@ -875,22 +945,37 @@ fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
                 _ => "assumed",
             };
             // Seeky's own note. Entries the user rewrote in the UI carry origin 'user'.
-            match db.insert_memory_with_title(kind, scope, title, text, None, "seeky") {
+            // A private note is about the person, so it never carries a project scope: that
+            // pairing would put it in the workspace block of the next turn.
+            let scope = if class == "private" || class == "own" {
+                "user"
+            } else {
+                scope
+            };
+            match db.insert_memory_in_class(kind, scope, title, text, None, "seeky", class) {
                 Ok(id) => {
-                    let _ = db.set_memory_workspace(id, workspace.trim());
+                    // Only work belongs to a workspace; a private note applies everywhere.
+                    if class == "work" {
+                        let _ = db.set_memory_workspace(id, workspace.trim());
+                    }
                     if let Err(error) = db.set_memory_basis(id, basis) {
                         crate::log_line!("memory: could not record the basis of #{id}: {error}");
                     }
                     // Thinking about what to keep is the behaviour trust is for; a flood of
                     // notes earns nothing extra.
                     award_trust(app, "memory", 1, 5, Some("wrote a memory"));
-                    let place = if workspace.trim().is_empty() {
-                        ""
-                    } else {
+                    let place = if class == "work" && !workspace.trim().is_empty() {
                         ", project"
+                    } else {
+                        ""
+                    };
+                    let sphere = match class {
+                        "private" => " — kept in confidence: never written into a file, a report or an answer",
+                        "own" => " — your own note",
+                        _ => "",
                     };
                     tools::ToolOutcome::ok(format!(
-                        "remembered as #{id} ({scope}/{kind}{place}, {basis}){}",
+                        "remembered as #{id} ({class}/{scope}/{kind}{place}, {basis}){sphere}{}",
                         if basis == "assumed" {
                             " — recalled with an [unverified] marker until something confirms it"
                         } else {
@@ -914,7 +999,14 @@ fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
             let importance = args.get("importance").and_then(Value::as_i64);
             let title = args.get("title").and_then(Value::as_str);
             let basis = args.get("basis").and_then(Value::as_str);
-            if text.is_none() && kind.is_none() && importance.is_none() && title.is_none() && basis.is_none() {
+            let class = args.get("class").and_then(Value::as_str);
+            if text.is_none()
+                && kind.is_none()
+                && importance.is_none()
+                && title.is_none()
+                && basis.is_none()
+                && class.is_none()
+            {
                 return tools::ToolOutcome::err("memory: nothing to update");
             }
             // Seeky rewrote it itself, so the entry is its own again — the user marker is
@@ -923,6 +1015,11 @@ fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
                 Ok(()) => {
                     if let Some(basis) = basis {
                         if let Err(error) = db.set_memory_basis(id, basis) {
+                            return tools::ToolOutcome::err(format!("memory: {error}"));
+                        }
+                    }
+                    if let Some(class) = class {
+                        if let Err(error) = db.set_memory_class(id, class) {
                             return tools::ToolOutcome::err(format!("memory: {error}"));
                         }
                     }
@@ -2119,6 +2216,7 @@ mod tests {
             retired_at: None,
             workspace: String::new(),
             basis: basis.to_string(),
+            class: "work".to_string(),
         };
 
         let block = recall_block(&[
@@ -2143,6 +2241,73 @@ mod tests {
 
     /// The recall has to say whose words these are — that marker is the whole point of the
     /// companion rows, and it is easy to lose in a prompt refactor.
+    /// The separation the user asked for: a note told in confidence is read in its own block,
+    /// with the prohibition attached, and never inside the project notes.
+    #[test]
+    fn a_private_note_is_never_read_as_project_material() {
+        let row = |class: &str, text: &str| crate::db::MemoryRow {
+            id: 1,
+            kind: "fact".to_string(),
+            scope: "user".to_string(),
+            title: None,
+            text: text.to_string(),
+            importance: 1,
+            created_at: 0,
+            origin: "user".to_string(),
+            edited_at: None,
+            retired_at: None,
+            workspace: String::new(),
+            basis: "verified".to_string(),
+            class: class.to_string(),
+        };
+
+        let block = recall_block(&[
+            row("work", "Das Projekt heißt DS.IDE"),
+            row("private", "Hat zwei Kinder"),
+            row("own", "Wollte Qdrant genauer ansehen"),
+        ]);
+
+        let project = block.find("## Your long-term memory").expect("project block");
+        let confident = block
+            .find("## What this person told you in confidence")
+            .expect("private block");
+        let own = block.find("## Your own notes").expect("own block");
+        assert!(project < confident && confident < own, "three blocks, in that order");
+
+        // The private line sits after the prohibition, not in the project list.
+        assert!(
+            block[project..confident].find("Hat zwei Kinder").is_none(),
+            "a private note must not appear in the project block"
+        );
+        assert!(block[confident..own].contains("Hat zwei Kinder"));
+        assert!(block[confident..own].contains("Never write them into a file"));
+        assert!(block[own..].contains("Wollte Qdrant genauer ansehen"));
+
+        // Only the spheres that exist get a header: no empty prose.
+        let only_work = recall_block(&[row("work", "Nur Arbeit")]);
+        assert!(!only_work.contains("in confidence"));
+        assert!(!only_work.contains("## Your own notes"));
+    }
+
+    /// No default: storing a note without saying whose sphere it is has to fail, because that
+    /// is the moment the four questions were skipped.
+    #[test]
+    fn a_note_without_a_class_is_refused() {
+        let missing = memory_class(&serde_json::json!({ "text": "irgendwas" })).unwrap_err();
+        assert!(missing.contains("'class' is required"), "{missing}");
+        assert!(missing.contains("ask_user"), "the way out must be named: {missing}");
+
+        let wrong = memory_class(&serde_json::json!({ "class": "secret" })).unwrap_err();
+        assert!(wrong.contains("work, private or own"), "{wrong}");
+
+        assert_eq!(memory_class(&serde_json::json!({ "class": "work" })).unwrap(), "work");
+        assert_eq!(
+            memory_class(&serde_json::json!({ "class": "private" })).unwrap(),
+            "private"
+        );
+        assert_eq!(memory_class(&serde_json::json!({ "class": "own" })).unwrap(), "own");
+    }
+
     #[test]
     fn recall_marks_scope_and_user_edits() {
         let row = |id: i64, scope: &str, text: &str, origin: &str, edited: bool| crate::db::MemoryRow {
@@ -2158,6 +2323,7 @@ mod tests {
             retired_at: None,
             workspace: String::new(),
             basis: "verified".to_string(),
+            class: "work".to_string(),
         };
 
         assert!(recall_block(&[]).is_empty(), "no memory, no block");

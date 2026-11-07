@@ -119,6 +119,11 @@ export const zhHans: Messages = {
     clean: "无需清理。",
     duplicates: "{count} 条重复记录",
     stale: "{count} 条长期未使用",
+      classWork: "工作",
+      classPrivate: "机密",
+      classOwn: "个人笔记",
+      classHint: "笔记属于哪个领域。机密笔记绝不会写入文件、报告或回答。",
+      classLabel: "领域",
   },
   skills: {
     title: "Skills",

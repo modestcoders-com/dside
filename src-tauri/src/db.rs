@@ -99,7 +99,10 @@ CREATE TABLE IF NOT EXISTS memories (
   origin       TEXT NOT NULL DEFAULT 'seeky',
   edited_at    INTEGER,
   retired_at   INTEGER,
-  workspace    TEXT NOT NULL DEFAULT ''
+  workspace    TEXT NOT NULL DEFAULT '',
+  -- work: the project, may appear in project files. private: told in confidence, never
+  -- written anywhere. own: the companion's own notes and interests.
+  class        TEXT NOT NULL DEFAULT 'work' CHECK (class IN ('work', 'private', 'own'))
 );
 CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope, kind);
 
@@ -216,6 +219,7 @@ fn row_to_memory(row: &rusqlite::Row<'_>) -> rusqlite::Result<MemoryRow> {
         retired_at: row.get(9)?,
         workspace: row.get(10)?,
         basis: row.get(11)?,
+        class: row.get(12)?,
     })
 }
 
@@ -470,6 +474,9 @@ pub struct MemoryRow {
     /// `verified` when a tool result confirmed it, `assumed` when it was reasoned or inferred.
     /// The recall labels the second kind so a guess cannot quietly become a remembered fact.
     pub basis: String,
+    /// Whose sphere this belongs to: `work` (the project), `private` (told in confidence, never
+    /// written into a file) or `own` (the companion's own shelf). See `recall_block`.
+    pub class: String,
 }
 
 pub struct Db {
@@ -547,6 +554,16 @@ impl Db {
         // Notes written before this existed were reasoned, not checked; calling them assumed is
         // the honest default, and a note the user wrote is marked as theirs by `origin` anyway.
         add_column(conn, "memories", "basis", "TEXT NOT NULL DEFAULT 'assumed'")?;
+        // Whose sphere a note belongs to. Everything written before this existed was stored as
+        // project knowledge, so `work` is the truthful default — the user can move a note into
+        // `private` in the memory panel. The constraint is what keeps a typo from inventing a
+        // fourth sphere that no query knows about.
+        add_column(
+            conn,
+            "memories",
+            "class",
+            "TEXT NOT NULL DEFAULT 'work' CHECK (class IN ('work', 'private', 'own'))",
+        )?;
         // The ordered timeline of an assistant answer.
         add_column(conn, "messages", "parts", "TEXT")?;
         add_column(conn, "file_versions", "turn_id", "TEXT")?;
@@ -1543,13 +1560,33 @@ impl Db {
         source: Option<&str>,
         origin: &str,
     ) -> Result<i64, String> {
+        self.insert_memory_in_class(kind, scope, title, text, source, origin, "work")
+    }
+
+    /// Same insert, with the sphere spelled out. Kept separate so the old call sites keep
+    /// working and every new one has to name what it is storing.
+    pub fn insert_memory_in_class(
+        &self,
+        kind: &str,
+        scope: &str,
+        title: Option<&str>,
+        text: &str,
+        source: Option<&str>,
+        origin: &str,
+        class: &str,
+    ) -> Result<i64, String> {
+        let class = match class {
+            "private" => "private",
+            "own" => "own",
+            _ => "work",
+        };
         let title = clean_title(title).unwrap_or_else(|| derive_title(text));
         let conn = self.lock()?;
         conn.execute(
             "INSERT INTO memories
-                (kind, scope, title, text, source, importance, created_at, origin)
-             VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7)",
-            params![kind, scope, title, text, source, now(), origin],
+                (kind, scope, title, text, source, importance, created_at, origin, class)
+             VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8)",
+            params![kind, scope, title, text, source, now(), origin, class],
         )
         .map_err(|error| error.to_string())?;
         Ok(conn.last_insert_rowid())
@@ -1579,6 +1616,23 @@ impl Db {
 
     /// Records whether a note is backed by a tool result or was inferred. Kept apart from
     /// `update_memory` so writing a note and judging its evidence stay separate acts.
+    /// Moves a note into another sphere. The user does this in the panel; the companion does it
+    /// through `memory update` when it realises a note sits in the wrong place.
+    pub fn set_memory_class(&self, id: i64, class: &str) -> Result<(), String> {
+        let class = match class {
+            "private" => "private",
+            "own" => "own",
+            _ => "work",
+        };
+        let conn = self.lock()?;
+        conn.execute(
+            "UPDATE memories SET class = ?1 WHERE id = ?2",
+            params![class, id],
+        )
+        .map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
     pub fn set_memory_basis(&self, id: i64, basis: &str) -> Result<(), String> {
         let basis = match basis {
             "verified" => "verified",
@@ -1595,7 +1649,7 @@ impl Db {
 
     pub fn list_memories(&self, limit: usize) -> Result<Vec<MemoryRow>, String> {
         self.select_memories(
-            "SELECT id, kind, scope, title, text, importance, created_at, origin, edited_at, retired_at, workspace, basis
+            "SELECT id, kind, scope, title, text, importance, created_at, origin, edited_at, retired_at, workspace, basis, class
              FROM memories WHERE retired_at IS NULL
              ORDER BY created_at DESC, id DESC LIMIT ?1",
             limit,
@@ -1605,7 +1659,7 @@ impl Db {
     /// Set aside, not erased: these are the entries the user took out of Seeky's memory.
     pub fn list_retired_memories(&self, limit: usize) -> Result<Vec<MemoryRow>, String> {
         self.select_memories(
-            "SELECT id, kind, scope, title, text, importance, created_at, origin, edited_at, retired_at, workspace, basis
+            "SELECT id, kind, scope, title, text, importance, created_at, origin, edited_at, retired_at, workspace, basis, class
              FROM memories WHERE retired_at IS NOT NULL
              ORDER BY retired_at DESC, id DESC LIMIT ?1",
             limit,
@@ -1628,7 +1682,7 @@ impl Db {
         let conn = self.lock()?;
         let mut statement = conn
             .prepare(
-                "SELECT id, kind, scope, title, text, importance, created_at, origin, edited_at, retired_at, workspace, basis
+                "SELECT id, kind, scope, title, text, importance, created_at, origin, edited_at, retired_at, workspace, basis, class
                  FROM memories
                  WHERE retired_at IS NULL AND (workspace = '' OR workspace = ?1)
                  ORDER BY importance DESC, COALESCE(last_used_at, 0) DESC, created_at DESC
@@ -2211,18 +2265,20 @@ pub fn memory_add(
     title: Option<String>,
     kind: Option<String>,
     scope: Option<String>,
+    class: Option<String>,
 ) -> Result<i64, String> {
     let text = text.trim();
     if text.is_empty() {
         return Err("a memory needs text".to_string());
     }
-    db.insert_memory_with_title(
+    db.insert_memory_in_class(
         kind.as_deref().unwrap_or("fact"),
         scope.as_deref().unwrap_or("user"),
         title.as_deref(),
         text,
         None,
         "user",
+        class.as_deref().unwrap_or("work"),
     )
 }
 
@@ -2241,6 +2297,7 @@ pub fn memory_update(
     text: Option<String>,
     kind: Option<String>,
     importance: Option<i64>,
+    class: Option<String>,
 ) -> Result<(), String> {
     db.update_memory(
         id,
@@ -2250,6 +2307,9 @@ pub fn memory_update(
         importance,
         "user",
     )?;
+    if let Some(class) = class {
+        db.set_memory_class(id, &class)?;
+    }
     // The user taking the time to correct a note is the clearest sign the work matters.
     crate::engine::award_trust(&app, "correction", 3, 3, Some("the user edited a memory"));
     Ok(())
@@ -2848,6 +2908,55 @@ mod tests {
     }
 
     /// The companion columns have to appear in a database that predates them.
+    /// The three spheres are a database fact, not a convention: the column exists, the CHECK
+    /// refuses a fourth value, and moving a note is one update.
+    #[test]
+    fn notes_live_in_three_spheres() {
+        let directory =
+            std::env::temp_dir().join(format!("ds-ide-spheres-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let db = Db::open(&directory.join("spheres.sqlite3")).unwrap();
+
+        let work = db
+            .insert_memory_in_class("fact", "user", None, "Projektnotiz", None, "seeky", "work")
+            .unwrap();
+        let private = db
+            .insert_memory_in_class("fact", "user", None, "Vertraulich", None, "seeky", "private")
+            .unwrap();
+        let own = db
+            .insert_memory_in_class("fact", "agent", None, "Eigene Notiz", None, "seeky", "own")
+            .unwrap();
+
+        let classes: Vec<(i64, String)> = db
+            .list_memories(10)
+            .unwrap()
+            .into_iter()
+            .map(|row| (row.id, row.class))
+            .collect();
+        assert!(classes.contains(&(work, "work".to_string())));
+        assert!(classes.contains(&(private, "private".to_string())));
+        assert!(classes.contains(&(own, "own".to_string())));
+
+        // Moving a note between spheres.
+        db.set_memory_class(private, "work").unwrap();
+        let moved = db
+            .list_memories(10)
+            .unwrap()
+            .into_iter()
+            .find(|row| row.id == private)
+            .unwrap();
+        assert_eq!(moved.class, "work");
+
+        // The constraint is what stops a typo from inventing a sphere no query knows about.
+        let conn = db.lock().unwrap();
+        let refused = conn.execute("UPDATE memories SET class = 'secret' WHERE id = ?1", [work]);
+        assert!(refused.is_err(), "the CHECK must reject an unknown sphere");
+        drop(conn);
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[test]
     fn migrate_adds_the_memory_columns() {
         let directory =
@@ -2886,6 +2995,10 @@ mod tests {
         assert_eq!(
             rows[0].basis, "assumed",
             "a note written before the field existed was reasoned, not checked"
+        );
+        assert_eq!(
+            rows[0].class, "work",
+            "everything stored before the field existed was project knowledge"
         );
 
         // New rows carry a title; without one, the first line becomes the heading.

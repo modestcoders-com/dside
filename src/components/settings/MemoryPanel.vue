@@ -29,6 +29,8 @@ interface MemoryRow {
   workspace: string;
   /** `verified` when a tool result backed the note, `assumed` when it was reasoned. */
   basis: string;
+  /** `work`, `private` or `own` — see the recall block. */
+  class: string;
 }
 
 interface MemoryReport {
@@ -128,6 +130,23 @@ const scopeLabels = computed<Record<string, string>>(() => ({
   agent: t("memory.scopeAgent"),
   session: t("memory.scopeSession"),
 }));
+
+/** The sphere is what decides whether a note may ever leave the conversation. */
+const classLabels = computed<Record<string, string>>(() => ({
+  work: t("memory.classWork"),
+  private: t("memory.classPrivate"),
+  own: t("memory.classOwn"),
+}));
+
+async function setClass(row: MemoryRow, value: string): Promise<void> {
+  if (value === row.class) return;
+  try {
+    await invoke("memory_update", { id: row.id, class: value });
+  } catch (cause) {
+    error.value = String(cause);
+  }
+  await load();
+}
 
 async function load() {
   loading.value = true;
@@ -337,6 +356,14 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
           <span class="memory-title">{{ titleFor(row) }}</span>
           <span class="entry-chips">
             <span class="chip scope">{{ scopeLabels[row.scope] ?? row.scope }}</span>
+            <span
+              v-if="row.class !== 'work'"
+              class="chip sphere"
+              :class="row.class"
+              :title="t('memory.classHint')"
+            >
+              {{ classLabels[row.class] ?? row.class }}
+            </span>
             <span v-if="row.workspace" class="chip project" :title="row.workspace">
               {{ t("memory.project") }}
             </span>
@@ -401,6 +428,14 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
               <h3 class="modal-title">{{ titleFor(selected) }}</h3>
               <div class="entry-chips">
                 <span class="chip scope">{{ scopeLabels[selected.scope] ?? selected.scope }}</span>
+                <span
+                  v-if="selected.class !== 'work'"
+                  class="chip sphere"
+                  :class="selected.class"
+                  :title="t('memory.classHint')"
+                >
+                  {{ classLabels[selected.class] ?? selected.class }}
+                </span>
                 <span v-if="selected.workspace" class="chip project" :title="selected.workspace">
                   {{ t("memory.project") }}
                 </span>
@@ -430,6 +465,21 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
             <textarea v-model="draftText" class="editor" rows="8"></textarea>
           </div>
           <div v-else class="modal-body full">{{ selected.text }}</div>
+
+          <div class="sphere-row">
+            <span class="label">{{ t("memory.classLabel") }}</span>
+            <select
+              class="sphere-select"
+              :value="selected.class"
+              :title="t('memory.classHint')"
+              @change="setClass(selected, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="work">{{ t("memory.classWork") }}</option>
+              <option value="private">{{ t("memory.classPrivate") }}</option>
+              <option value="own">{{ t("memory.classOwn") }}</option>
+            </select>
+            <span class="sphere-hint">{{ t("memory.classHint") }}</span>
+          </div>
 
           <footer class="modal-foot">
             <template v-if="editing">
@@ -630,6 +680,47 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
   padding: 1px 7px;
   border-radius: 999px;
   font-size: 11px;
+}
+
+.chip.sphere.private {
+  border-color: var(--accent-strong);
+  color: var(--accent);
+}
+
+.chip.sphere.own {
+  color: var(--text-muted);
+}
+
+.sphere-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.sphere-row .label {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sphere-select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.sphere-hint {
+  flex: 1;
+  min-width: 180px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .chip.scope {

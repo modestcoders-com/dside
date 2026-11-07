@@ -120,6 +120,11 @@ export const ru: Messages = {
     clean: "Чистить нечего.",
     duplicates: "{count} повторяющихся записей",
     stale: "{count} давно неиспользуемых",
+      classWork: "работа",
+      classPrivate: "конфиденциально",
+      classOwn: "своя заметка",
+      classHint: "К какой сфере относится заметка. Конфиденциальные заметки никогда не записываются в файл, отчёт или ответ.",
+      classLabel: "Сфера",
   },
   skills: {
     title: "Skills",

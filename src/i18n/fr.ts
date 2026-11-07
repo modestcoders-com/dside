@@ -119,6 +119,11 @@ export const fr: Messages = {
     clean: "Rien à nettoyer.",
     duplicates: "{count} entrées en double",
     stale: "{count} entrées anciennes jamais utilisées",
+      classWork: "travail",
+      classPrivate: "confidentiel",
+      classOwn: "note personnelle",
+      classHint: "À quelle sphère appartient la note. Les notes confidentielles ne sont jamais écrites dans un fichier, un rapport ou une réponse.",
+      classLabel: "Sphère",
   },
   skills: {
     title: "Compétences",

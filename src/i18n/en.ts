@@ -120,6 +120,11 @@ export const en: Messages = {
     clean: "Nothing to clean up.",
     duplicates: "{count} duplicate entries",
     stale: "{count} long-unused entries",
+      classWork: "work",
+      classPrivate: "confidential",
+      classOwn: "own note",
+      classHint: "Which sphere the note belongs to. Confidential notes are never written into a file, a report or an answer.",
+      classLabel: "Sphere",
   },
   skills: {
     title: "Skills",

@@ -4573,3 +4573,66 @@ indem er zwei der drei Punkte nachgeprüft und einen korrigiert hat.
 
 **Geprüft:** `cargo test --lib` 81 / 14 ignoriert, `pnpm build` grün (506 Schlüssel).
 Kein Version-Bump, kein Tag — das ist ein Nachlauf zum 0.6.0-Release.
+
+## 109. Drei Sphären: Arbeit, Vertrauliches, eigene Notizen (2026-11-07)
+
+Der Companion hat bisher alles, was er über den Menschen und die Arbeit erfuhr, in **eine**
+Erinnerung geschrieben und sie in **einem** Block in den System-Prompt gegeben. Damit war eine
+beiläufige Bemerkung strukturell dasselbe wie ein Projektfakt — und nichts hinderte daran, sie
+in eine Datei zu schreiben.
+
+### Die Trennung
+`memories` hat eine Spalte `class`, per CHECK auf `work`, `private`, `own` begrenzt:
+- **work** — das Projekt. Darf in Projektdateien, Commits und Antworten vorkommen.
+- **private** — etwas, das der Mensch dem Begleiter anvertraut hat. Erscheint **nie** in einer
+  Datei, einem Bericht, einer Commit-Nachricht oder einer Antwort — nicht umformuliert, nicht als
+  Beispiel, nicht „als Kontext".
+- **own** — das eigene Regal des Begleiters.
+
+Bestehende Notizen bekommen `work`: sie wurden als Projektwissen abgelegt. Im Panel lässt sich
+jede umziehen.
+
+### Die Einordnung, bevor etwas gespeichert wird
+`memory add` hat **keinen Default** für `class`. Fehlt sie, schlägt der Aufruf fehl und nennt die
+vier Fragen: *Gehört das zum Auftrag, den ich gerade habe? Gehört es zum Projekt im Allgemeinen?
+Sagt mir der Mensch das nur? War es eindeutig formuliert?* Ist die letzte Antwort nein, wird
+nichts gespeichert — dann steht dort der Weg: `ask_user` benutzen und warten.
+
+Das ist der Kern: die Einordnung ist Arbeit, und sie passiert **vor** dem Schreiben. Eine Notiz
+auf einer Vermutung ist schlechter als keine Notiz.
+
+Eine private Notiz bekommt nie einen Projekt-Scope und nie einen Workspace — sonst landete sie
+beim nächsten Turn im Projektblock.
+
+### Der Prompt
+`recall_block` gibt jetzt **drei Blöcke** statt einer Liste, jeder mit seiner eigenen Anweisung:
+der Projektblock wie bisher; der vertrauliche mit ausdrücklichem Schreibverbot, „bring es nicht
+von selbst zur Sprache" und „keine ungefragten Bewertungen zu Familie, Gesundheit, Geld oder
+Recht"; das eigene Regal knapp.
+
+In `persona.ts` drei Ergänzungen:
+- die vier Fragen und der Weg über `ask_user`, wenn eine unbeantwortet bleibt;
+- *„A remark is not a brief"* — eine beiläufige Bemerkung ist Kontext, kein Auftrag und keine
+  Einladung zum Ratgeben;
+- *„Everything in the workspace can end up published"* — was nur aus einer privaten Notiz stammt,
+  gehört in keine Datei, keine Commit-Nachricht und keine Dokumentation.
+
+### Oberfläche
+Das Panel zeigt eine Sphäre nur, wenn sie nicht `work` ist (vertraulich hervorgehoben), und im
+Detail gibt es ein Auswahlfeld „Sphäre" mit dem Satz, was vertraulich bedeutet. Der Nutzer
+entscheidet also selbst, nicht nur der Begleiter.
+
+### Geprüft
+`cargo test --lib` **84** / 14 ignoriert, `pnpm build` grün (511 Schlüssel).
+- `notes_live_in_three_spheres`: alle drei Klassen, Umzug, und das CHECK weist einen erfundenen
+  Wert ab.
+- `a_note_without_a_class_is_refused`: fehlende Klasse nennt die Fragen und `ask_user`.
+- `a_private_note_is_never_read_as_project_material`: drei Blöcke in Reihenfolge, die private
+  Zeile steht **hinter** dem Verbot und nicht im Projektblock, leere Sphären bekommen keine
+  Überschrift.
+- Migration auf einer **Kopie** der echten Datenbank: 7 vorhandene Notizen, alle `work`.
+- Live: drei Notizen angelegt, im Panel als „vertraulich" und „eigene Notiz" markiert; über das
+  Auswahlfeld von `work` nach `private` verschoben und in der Datenbank bestätigt.
+
+Offen: ein Freizeit-/Neugier-System wie in peer² (eigenes Regal mit Verfolgung) ist hier nur die
+kleine Form `own`. Kein Version-Bump.

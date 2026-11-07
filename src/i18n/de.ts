@@ -119,6 +119,11 @@ export const de = {
     clean: "Nichts zu bereinigen.",
     duplicates: "{count} doppelte Einträge",
     stale: "{count} nie benutzte, alte Einträge",
+      classWork: "Arbeit",
+      classPrivate: "vertraulich",
+      classOwn: "eigene Notiz",
+      classHint: "Wohin die Notiz gehört. Vertrauliche Notizen werden nie in eine Datei, einen Bericht oder eine Antwort geschrieben.",
+      classLabel: "Sphäre",
   },
   skills: {
     title: "Skills",

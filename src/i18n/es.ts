@@ -120,6 +120,11 @@ export const es: Messages = {
     clean: "Nada que limpiar.",
     duplicates: "{count} entradas duplicadas",
     stale: "{count} entradas antiguas sin usar",
+      classWork: "trabajo",
+      classPrivate: "confidencial",
+      classOwn: "nota propia",
+      classHint: "A qué esfera pertenece la nota. Las notas confidenciales nunca se escriben en un archivo, un informe ni una respuesta.",
+      classLabel: "Esfera",
   },
   skills: {
     title: "Habilidades",
