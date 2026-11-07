@@ -4846,3 +4846,63 @@ ist ein ehrlicher Test für ein Packproblem.
 ### Offen
 0.6.1 ist veröffentlicht und enthält den Fehler. Der Fix ist committet; ein Patch-Release
 (0.6.2) braucht die Freigabe des Nutzers.
+
+## 114. Flatpak für DS·IDE (2026-11-08)
+
+Der Nutzer installiert und aktualisiert die anderen Projekte über Flatpak (Discover), und das
+klappt dort; bei DS·IDE nicht. Dazu der Vorschlag, den ich übernehme: **Linux-Pakete lokal
+bauen und starten, bevor ein Tag gesetzt wird** — ein Tag startet die macOS- und
+Windows-Builds, die hier nicht prüfbar sind.
+
+### Warum Shelly das AppImage nicht aktualisiert
+Ein Tauri-AppImage enthält **keine Update-Information**: kein `zsync`-Block, keine
+AppImageUpdate-Metadaten (`strings | grep -c zsync|appimageupdate` → 0). Shelly erkennt über
+GitHub, dass es eine neue Fassung gibt, kann die installierte Datei aber nicht zuordnen und
+lädt wieder das Original. Das ist eine Grenze des Tauri-Bundlers, nicht ein Fehler in Shelly —
+und der Grund, warum das Flatpak der richtige Weg für Installation und Updates ist.
+
+### Was gebaut wurde
+`packaging/flatpak/`: Manifest (`com.deepvibe.dside`), Desktop-Datei, AppStream-Metainfo, Icon
+und `build.sh`. Der Build kompiliert das Programm zuerst und packt es danach ein; der Sandkasten
+kopiert nur noch. Ergebnis: **`target/flatpak/DS-IDE-<version>-x86_64.flatpak`, 15 MB**, lokal
+installiert und gestartet.
+
+Drei Dinge mussten gelöst werden, jedes eine echte Sackgasse:
+
+**1. Das Tray-Icon ließ das Programm in der Sandbox abstürzen.** Die GNOME-Runtime enthält kein
+`libayatana-appindicator`, und `libappindicator-sys` **panikt** dann, statt einen Fehler
+zurückzugeben. `catch_unwind` hilft nicht: das Release-Profil ist mit `panic = "abort"` gebaut
+(Exit 134). Die App prüft die Bibliothek jetzt **vorher** mit `dlopen` (`tray_supported`) und
+startet ohne Icon — beim Schließen beendet sie sich dann, was ohne Icon die ehrliche Antwort
+ist. Das gilt auch außerhalb von Flatpak: eine fehlende optionale Bibliothek darf die App nicht
+töten.
+
+**2. `git` fehlt in der Runtime.** Ein IDE ohne Git-Panel ist halb. git wird im Manifest aus
+dem Quelltext gebaut. Zwei Anläufe waren nötig: git 2.47 scheitert an einer `unreachable`-
+Makro-Kollision mit der neueren glibc der Runtime, und git ≥ 2.51 ruft `cargo` für `libgitcore`
+auf, das im GNOME-SDK nicht existiert. Deshalb **git 2.56.0 mit `NO_RUST=1`**. Danach:
+`git version 2.56.0` und `git ls-remote https://…` **im Sandkasten** funktionieren.
+
+**3. Sandkasten-Regeln.** `--filesystem=home` (das Arbeitsverzeichnis wählt der Nutzer),
+`--share=network` (Modell-API), `--talk-name=org.freedesktop.secrets` (Schlüsselbund),
+`--socket=wayland`/`fallback-x11`, `--device=dri`.
+
+### Geprüft
+- `flatpak-builder` grün, Bundle installiert (`flatpak install --user`).
+- Start ohne Absturz: Fenster öffnet, Titel „DS·IDE — me" (der Projektname aus dem
+  Arbeitsverzeichnis, also greift auch der neue Fenstertitel), Oberfläche vollständig.
+  Tray-Meldung: „not available — the appindicator library is missing", **kein Panic**.
+- Im Sandkasten: `git --version` = 2.56.0, `git ls-remote https://…` liefert die Ref.
+- Desktop-Eintrag exportiert (`~/.local/share/flatpak/exports/share/applications/…`), also im
+  KDE-Menü, und `flatpak update` ist der Update-Weg.
+- `cargo test --lib` 89 / 14 ignoriert.
+
+### Offen
+- **Screenshots** (das Auge des Begleiters) gehen im Sandkasten nicht: kein `grim`/`spectacle`
+  im Image, Portal nicht angebunden. Das Werkzeug meldet den Fehler sauber.
+- **Kein Tray-Icon** im Flatpak (siehe 1). Wer die Erinnerungen im Hintergrund braucht, schließt
+  das Fenster nicht — die App beendet sich dort bewusst.
+- Der `.flatpak` hängt noch nicht am Release; das CI baut ihn nicht. Mit dem Vorschlag des
+  Nutzers (lokal bauen, dann taggen) kann er beim Release von Hand hochgeladen werden.
+- `flatpak-builder` braucht Netz für den git-Quelltext. Ein späterer Umzug auf eine gepinnte,
+  mitgelieferte Quelle wäre reproduzierbarer.

@@ -44,3 +44,6 @@ src-tauri/secrets.json
 
 # Local list for scripts/check-private.mjs — never published
 .private-names
+
+# Build products of the Flatpak
+/target/

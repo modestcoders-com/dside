@@ -1,0 +1,62 @@
+# Flatpak for DS·IDE.
+#
+# The app is packaged from the release binary rather than built inside the sandbox: the
+# frontend and the Rust side are compiled by `build.sh` with the same flags a normal release
+# uses, so the packaged program is the one that was tested. The sandbox only installs it.
+#
+# The GNOME runtime carries WebKitGTK, GTK and libsoup, which a Tauri window needs.
+app-id: com.deepvibe.dside
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: DSIDE
+
+finish-args:
+  # A window needs a display, a renderer and the network for the model API.
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # The workspace is whatever folder the user picks; a narrower rule would refuse half of them.
+  - --filesystem=home
+  # The API key lives in the OS keyring, and the app posts notifications.
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Opening pages in the user's browser goes through the portal.
+  - --talk-name=org.freedesktop.portal.OpenURI
+
+modules:
+  # git is not in the GNOME runtime, and an IDE without its version control is half an IDE.
+  # Built here from source so the git panel, the terminal and the companion's shell all find
+  # it; the runtime supplies zlib, curl and openssl it links against.
+  - name: git
+    buildsystem: simple
+    build-commands:
+      - make -j "$FLATPAK_BUILDER_N_JOBS" prefix=/app gitexecdir=/app/libexec/git-core
+        NO_GETTEXT=1 NO_TCLTK=1 NO_PERL=1 NO_PYTHON=1 NO_TEST=1 NO_INSTALL_HARDLINKS=1
+        NO_RUST=1
+      - make prefix=/app gitexecdir=/app/libexec/git-core NO_GETTEXT=1 NO_TCLTK=1
+        NO_PERL=1 NO_PYTHON=1 NO_INSTALL_HARDLINKS=1 NO_RUST=1 install
+    sources:
+      - type: archive
+        url: https://www.kernel.org/pub/software/scm/git/git-2.56.0.tar.xz
+        sha256: 26c56c296b38c0695b26fa95f475f1d01704d2d38e73465ca30b0b2f5dc789d3
+
+  - name: dside
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 DSIDE /app/bin/DSIDE
+      - install -Dm644 com.deepvibe.dside.desktop /app/share/applications/com.deepvibe.dside.desktop
+      - install -Dm644 com.deepvibe.dside.metainfo.xml /app/share/metainfo/com.deepvibe.dside.metainfo.xml
+      - install -Dm644 com.deepvibe.dside.png /app/share/icons/hicolor/512x512/apps/com.deepvibe.dside.png
+    sources:
+      - type: file
+        path: DSIDE
+      - type: file
+        path: com.deepvibe.dside.desktop
+      - type: file
+        path: com.deepvibe.dside.metainfo.xml
+      - type: file
+        path: com.deepvibe.dside.png

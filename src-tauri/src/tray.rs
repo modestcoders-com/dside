@@ -44,6 +44,18 @@ impl TrayState {
 /// without a StatusNotifier host or without the appindicator library — and the caller keeps
 /// "closing quits" then.
 pub fn install(app: &AppHandle) -> bool {
+    // A tray icon needs GTK's appindicator on Linux, and that library is not in every
+    // environment: the GNOME runtime does not ship it, nor does a minimal desktop. The crate
+    // behind it *panics* (not returns) when the library is missing, and the release profile is
+    // built with `panic = "abort"`, so a catch would not help — the check has to come first.
+    // Without an icon the window still opens, and closing quits, which is the honest behaviour.
+    if !tray_supported() {
+        crate::log_line!(
+            "tray: not available — the appindicator library is missing in this environment"
+        );
+        return false;
+    }
+
     let (menu, open, quit) = match tray_menu(app) {
         Ok(parts) => parts,
         Err(error) => {
@@ -99,6 +111,40 @@ pub fn install(app: &AppHandle) -> bool {
             false
         }
     }
+}
+
+/// Can this environment show a tray icon at all?
+#[cfg(target_os = "linux")]
+fn tray_supported() -> bool {
+    // The same four names the appindicator crate tries, in the same order.
+    const NAMES: [&str; 4] = [
+        "libayatana-appindicator3.so.1",
+        "libappindicator3.so.1",
+        "libayatana-appindicator3.so",
+        "libappindicator3.so",
+    ];
+    NAMES.iter().any(|name| {
+        let Ok(cname) = std::ffi::CString::new(*name) else {
+            return false;
+        };
+        // SAFETY: a plain dlopen/dlclose pair on a constant name; the handle is closed again
+        // and never dereferenced. RTLD_LAZY is enough to prove the library exists.
+        unsafe {
+            let handle = libc::dlopen(cname.as_ptr(), libc::RTLD_LAZY | libc::RTLD_LOCAL);
+            if handle.is_null() {
+                false
+            } else {
+                libc::dlclose(handle);
+                true
+            }
+        }
+    })
+}
+
+/// macOS and Windows always have a tray; nothing to check.
+#[cfg(not(target_os = "linux"))]
+fn tray_supported() -> bool {
+    true
 }
 
 /// Rewrites the two menu entries. Called by the frontend once it knows the language, and again

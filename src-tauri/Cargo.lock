@@ -10,6 +10,7 @@ dependencies = [
  "glob",
  "image",
  "keyring",
+ "libc",
  "portable-pty",
  "regex",
  "reqwest 0.12.28",
