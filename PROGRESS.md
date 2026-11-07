@@ -4746,3 +4746,7 @@ Damit es nicht wieder passiert, mechanisch und nicht als Bitte:
 
 ### Geprüft
 `cargo test --lib` **85** / 14 ignoriert, `pnpm build` grün (515 Schlüssel), `check-private` sauber.
+
+## Version
+0.6.1 — Patch: Autoscroll, Fenstertitel, Tonlage, Textwächter. Die vier Punkte stehen in den
+Release-Notizen; kein neues Feature, keine Änderung an der Datenbank außer dem busy_timeout.
