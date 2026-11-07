@@ -32,6 +32,25 @@ import {
 } from "../composables/useEngine";
 
 const accountOpen = ref(false);
+const accountButton = ref<HTMLElement | null>(null);
+/**
+ * The menu is opened *outside* the side panel's box: the panel clips its children
+ * (`overflow: hidden`), so an absolutely positioned menu was cut off at the rail's edge and
+ * vanished under the chat panel. Fixed coordinates from the button keep it whole.
+ */
+const menuBox = ref({ left: 8, bottom: 52 });
+
+function toggleAccountMenu(): void {
+  if (!accountOpen.value && accountButton.value) {
+    const box = accountButton.value.getBoundingClientRect();
+    const width = 260;
+    menuBox.value = {
+      left: Math.max(8, Math.min(box.left, window.innerWidth - width - 8)),
+      bottom: Math.max(8, window.innerHeight - box.top + 6),
+    };
+  }
+  accountOpen.value = !accountOpen.value;
+}
 const confirmSignOut = ref(false);
 const systemName = ref("User");
 const displayName = computed(() => settings.displayName.trim() || systemName.value);
@@ -415,14 +434,23 @@ function accountSettings() {
     </div>
 
     <div class="rail-foot">
-      <button class="account" type="button" @click.stop="accountOpen = !accountOpen">
+      <button
+        ref="accountButton"
+        class="account"
+        type="button"
+        @click.stop="toggleAccountMenu"
+      >
         <DeepSeekWhale class="brand-mark" :height="26" :label="t('app.name')" />
         <span class="ds-mark" v-html="deepSeekMark"></span>
         <Icon name="chevron-down" :size="14" class="account-chevron" />
       </button>
 
       <div v-if="accountOpen" class="backdrop" @click="accountOpen = false"></div>
-      <div v-if="accountOpen" class="account-menu">
+      <div
+        v-if="accountOpen"
+        class="account-menu"
+        :style="{ left: `${menuBox.left}px`, bottom: `${menuBox.bottom}px` }"
+      >
         <div class="menu-head">
           <span class="menu-name">{{ displayName }}</span>
         </div>
@@ -758,11 +786,11 @@ function accountSettings() {
 }
 
 .account-menu {
-  position: absolute;
-  bottom: 52px;
-  left: 8px;
-  z-index: 40;
-  width: min(260px, calc(100vw - 24px));
+  position: fixed;
+  z-index: 60;
+  width: max-content;
+  min-width: 220px;
+  max-width: min(300px, calc(100vw - 24px));
   padding: 6px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);

@@ -121,7 +121,6 @@ export const zhHans: Messages = {
     stale: "{count} 条长期未使用",
       classWork: "工作",
       classPrivate: "机密",
-      classOwn: "个人笔记",
       classHint: "笔记属于哪个领域。机密笔记绝不会写入文件、报告或回答。",
       classLabel: "领域",
   },
@@ -579,11 +578,17 @@ export const zhHans: Messages = {
     allowlist: "仅允许的命令",
     allowlistDesc: "bash 工具只能启动列表中的程序；包含未允许程序、重定向和反引号的命令链会被拒绝。",
     commands: "允许的程序",
-    commandsHint: "每行一个程序名，或用逗号分隔。",
+    commandsHint:
+      "只写程序名 —— 不含路径和参数。",
     reset: "恢复默认值",
     workspace: "仅在 workspace 内写入",
     workspaceDesc: "workspace 之外的 write/edit 会被拒绝。",
     note: "这是策略，不是操作系统沙箱。你的终端不受限制；node、python 和 pnpm 仍能做很多事。",
+    add: "新增",
+    addCommand: "添加程序",
+    addPlaceholder: "程序…",
+    invalidCommand: "只允许字母、数字、点、下划线、加号和连字符。",
+    removeCommand: "移除 {command}",
   },
 
   workspacePicker: {

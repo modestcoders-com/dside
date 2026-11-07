@@ -694,18 +694,16 @@ pub async fn run_due_schedules(app: &AppHandle) {
 /// The part of the system prompt that hands the partner its own memory. Split out so the
 /// wording — the spheres and the user's marker included — is testable without a live turn.
 ///
-/// Three spheres, in three blocks, because they are read differently: project notes are
-/// working material, private notes are context that must never leave the conversation, and the
-/// companion's own notes are its own business. Mixing them in one list is how a note told in
-/// confidence ends up in a README.
+/// Two spheres, in two blocks, because they are read differently: project notes are working
+/// material, private notes are context that must never leave the conversation. Mixing them in
+/// one list is how a note told in confidence ends up in a README.
 fn recall_block(rows: &[crate::db::MemoryRow]) -> String {
     if rows.is_empty() {
         return String::new();
     }
 
-    let work: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class == "work").collect();
+    let work: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class != "private").collect();
     let private: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class == "private").collect();
-    let own: Vec<&crate::db::MemoryRow> = rows.iter().filter(|row| row.class == "own").collect();
 
     let mut block = String::new();
 
@@ -741,17 +739,6 @@ fn recall_block(rows: &[crate::db::MemoryRow]) -> String {
              judgement about family, health, money or legal matters.\n",
         );
         for row in &private {
-            block.push_str(&format_line(row));
-        }
-    }
-
-    if !own.is_empty() {
-        block.push_str(
-            "\n\n## Your own notes\n\
-             Things you noted for yourself — what you want to remember, follow up or look into.\n\
-             They are yours; the user can read them, which is not the same as being asked about them.\n",
-        );
-        for row in &own {
             block.push_str(&format_line(row));
         }
     }
@@ -904,8 +891,7 @@ fn memory_class(args: &Value) -> Result<&'static str, String> {
     match args.get("class").and_then(Value::as_str) {
         Some("work") => Ok("work"),
         Some("private") => Ok("private"),
-        Some("own") => Ok("own"),
-        Some(other) => Err(format!("'class' must be work, private or own, not '{other}'")),
+        Some(other) => Err(format!("'class' must be work or private, not '{other}'")),
         None => Err(
             "'class' is required. Decide it from the four questions: does this belong to the work \
              I was asked to do, to the project in general, or is the person telling me only? If any \
@@ -947,11 +933,7 @@ fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
             // Seeky's own note. Entries the user rewrote in the UI carry origin 'user'.
             // A private note is about the person, so it never carries a project scope: that
             // pairing would put it in the workspace block of the next turn.
-            let scope = if class == "private" || class == "own" {
-                "user"
-            } else {
-                scope
-            };
+            let scope = if class == "private" { "user" } else { scope };
             match db.insert_memory_in_class(kind, scope, title, text, None, "seeky", class) {
                 Ok(id) => {
                     // Only work belongs to a workspace; a private note applies everywhere.
@@ -969,10 +951,10 @@ fn memory_tool(app: &AppHandle, args: &Value, workspace: &str) -> tools::ToolOut
                     } else {
                         ""
                     };
-                    let sphere = match class {
-                        "private" => " — kept in confidence: never written into a file, a report or an answer",
-                        "own" => " — your own note",
-                        _ => "",
+                    let sphere = if class == "private" {
+                        " — kept in confidence: never written into a file, a report or an answer"
+                    } else {
+                        ""
                     };
                     tools::ToolOutcome::ok(format!(
                         "remembered as #{id} ({class}/{scope}/{kind}{place}, {basis}){sphere}{}",
@@ -2264,29 +2246,25 @@ mod tests {
         let block = recall_block(&[
             row("work", "Das Projekt heißt DS.IDE"),
             row("private", "Hat zwei Kinder"),
-            row("own", "Wollte Qdrant genauer ansehen"),
         ]);
 
         let project = block.find("## Your long-term memory").expect("project block");
         let confident = block
             .find("## What this person told you in confidence")
             .expect("private block");
-        let own = block.find("## Your own notes").expect("own block");
-        assert!(project < confident && confident < own, "three blocks, in that order");
+        assert!(project < confident, "the private block follows the project block");
 
         // The private line sits after the prohibition, not in the project list.
         assert!(
             block[project..confident].find("Hat zwei Kinder").is_none(),
             "a private note must not appear in the project block"
         );
-        assert!(block[confident..own].contains("Hat zwei Kinder"));
-        assert!(block[confident..own].contains("Never write them into a file"));
-        assert!(block[own..].contains("Wollte Qdrant genauer ansehen"));
+        assert!(block[confident..].contains("Hat zwei Kinder"));
+        assert!(block[confident..].contains("Never write them into a file"));
 
         // Only the spheres that exist get a header: no empty prose.
         let only_work = recall_block(&[row("work", "Nur Arbeit")]);
         assert!(!only_work.contains("in confidence"));
-        assert!(!only_work.contains("## Your own notes"));
     }
 
     /// No default: storing a note without saying whose sphere it is has to fail, because that
@@ -2298,14 +2276,13 @@ mod tests {
         assert!(missing.contains("ask_user"), "the way out must be named: {missing}");
 
         let wrong = memory_class(&serde_json::json!({ "class": "secret" })).unwrap_err();
-        assert!(wrong.contains("work, private or own"), "{wrong}");
+        assert!(wrong.contains("work or private"), "{wrong}");
 
         assert_eq!(memory_class(&serde_json::json!({ "class": "work" })).unwrap(), "work");
         assert_eq!(
             memory_class(&serde_json::json!({ "class": "private" })).unwrap(),
             "private"
         );
-        assert_eq!(memory_class(&serde_json::json!({ "class": "own" })).unwrap(), "own");
     }
 
     #[test]

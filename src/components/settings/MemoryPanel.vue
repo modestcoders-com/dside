@@ -29,7 +29,7 @@ interface MemoryRow {
   workspace: string;
   /** `verified` when a tool result backed the note, `assumed` when it was reasoned. */
   basis: string;
-  /** `work`, `private` or `own` — see the recall block. */
+  /** `work` or `private` — see the recall block. */
   class: string;
 }
 
@@ -135,7 +135,6 @@ const scopeLabels = computed<Record<string, string>>(() => ({
 const classLabels = computed<Record<string, string>>(() => ({
   work: t("memory.classWork"),
   private: t("memory.classPrivate"),
-  own: t("memory.classOwn"),
 }));
 
 async function setClass(row: MemoryRow, value: string): Promise<void> {
@@ -476,7 +475,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
             >
               <option value="work">{{ t("memory.classWork") }}</option>
               <option value="private">{{ t("memory.classPrivate") }}</option>
-              <option value="own">{{ t("memory.classOwn") }}</option>
             </select>
             <span class="sphere-hint">{{ t("memory.classHint") }}</span>
           </div>
@@ -685,10 +683,6 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKey));
 .chip.sphere.private {
   border-color: var(--accent-strong);
   color: var(--accent);
-}
-
-.chip.sphere.own {
-  color: var(--text-muted);
 }
 
 .sphere-row {

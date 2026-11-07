@@ -101,8 +101,9 @@ CREATE TABLE IF NOT EXISTS memories (
   retired_at   INTEGER,
   workspace    TEXT NOT NULL DEFAULT '',
   -- work: the project, may appear in project files. private: told in confidence, never
-  -- written anywhere. own: the companion's own notes and interests.
-  class        TEXT NOT NULL DEFAULT 'work' CHECK (class IN ('work', 'private', 'own'))
+  -- written anywhere. A third sphere for the companion's own interests was tried and belongs
+  -- to peer², not to a product for professional use.
+  class        TEXT NOT NULL DEFAULT 'work' CHECK (class IN ('work', 'private'))
 );
 CREATE INDEX IF NOT EXISTS idx_memories_scope ON memories(scope, kind);
 
@@ -474,8 +475,8 @@ pub struct MemoryRow {
     /// `verified` when a tool result confirmed it, `assumed` when it was reasoned or inferred.
     /// The recall labels the second kind so a guess cannot quietly become a remembered fact.
     pub basis: String,
-    /// Whose sphere this belongs to: `work` (the project), `private` (told in confidence, never
-    /// written into a file) or `own` (the companion's own shelf). See `recall_block`.
+    /// Whose sphere this belongs to: `work` (the project) or `private` (told in confidence,
+    /// never written into a file). See `recall_block`.
     pub class: String,
 }
 
@@ -562,8 +563,11 @@ impl Db {
             conn,
             "memories",
             "class",
-            "TEXT NOT NULL DEFAULT 'work' CHECK (class IN ('work', 'private', 'own'))",
+            "TEXT NOT NULL DEFAULT 'work' CHECK (class IN ('work', 'private'))",
         )?;
+        // An unreleased build allowed a third sphere (`own`); fold it back into work. Rows in
+        // the other direction never existed, and the statement is idempotent.
+        let _ = conn.execute("UPDATE memories SET class = 'work' WHERE class = 'own'", []);
         // The ordered timeline of an assistant answer.
         add_column(conn, "messages", "parts", "TEXT")?;
         add_column(conn, "file_versions", "turn_id", "TEXT")?;
@@ -1575,11 +1579,7 @@ impl Db {
         origin: &str,
         class: &str,
     ) -> Result<i64, String> {
-        let class = match class {
-            "private" => "private",
-            "own" => "own",
-            _ => "work",
-        };
+        let class = if class == "private" { "private" } else { "work" };
         let title = clean_title(title).unwrap_or_else(|| derive_title(text));
         let conn = self.lock()?;
         conn.execute(
@@ -1619,11 +1619,7 @@ impl Db {
     /// Moves a note into another sphere. The user does this in the panel; the companion does it
     /// through `memory update` when it realises a note sits in the wrong place.
     pub fn set_memory_class(&self, id: i64, class: &str) -> Result<(), String> {
-        let class = match class {
-            "private" => "private",
-            "own" => "own",
-            _ => "work",
-        };
+        let class = if class == "private" { "private" } else { "work" };
         let conn = self.lock()?;
         conn.execute(
             "UPDATE memories SET class = ?1 WHERE id = ?2",
@@ -2908,10 +2904,10 @@ mod tests {
     }
 
     /// The companion columns have to appear in a database that predates them.
-    /// The three spheres are a database fact, not a convention: the column exists, the CHECK
-    /// refuses a fourth value, and moving a note is one update.
+    /// The two spheres are a database fact, not a convention: the column exists, the CHECK
+    /// refuses anything else, and moving a note is one update.
     #[test]
-    fn notes_live_in_three_spheres() {
+    fn notes_live_in_two_spheres() {
         let directory =
             std::env::temp_dir().join(format!("ds-ide-spheres-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
@@ -2924,8 +2920,10 @@ mod tests {
         let private = db
             .insert_memory_in_class("fact", "user", None, "Vertraulich", None, "seeky", "private")
             .unwrap();
-        let own = db
-            .insert_memory_in_class("fact", "agent", None, "Eigene Notiz", None, "seeky", "own")
+        // An unknown sphere is not a third one: it falls back to work rather than inventing a
+        // classification no query knows about.
+        let fallback = db
+            .insert_memory_in_class("fact", "user", None, "Unbekannt", None, "seeky", "own")
             .unwrap();
 
         let classes: Vec<(i64, String)> = db
@@ -2936,7 +2934,7 @@ mod tests {
             .collect();
         assert!(classes.contains(&(work, "work".to_string())));
         assert!(classes.contains(&(private, "private".to_string())));
-        assert!(classes.contains(&(own, "own".to_string())));
+        assert!(classes.contains(&(fallback, "work".to_string())));
 
         // Moving a note between spheres.
         db.set_memory_class(private, "work").unwrap();

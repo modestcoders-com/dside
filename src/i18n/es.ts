@@ -122,7 +122,6 @@ export const es: Messages = {
     stale: "{count} entradas antiguas sin usar",
       classWork: "trabajo",
       classPrivate: "confidencial",
-      classOwn: "nota propia",
       classHint: "A qué esfera pertenece la nota. Las notas confidenciales nunca se escriben en un archivo, un informe ni una respuesta.",
       classLabel: "Esfera",
   },
@@ -581,11 +580,17 @@ export const es: Messages = {
     allowlist: "Solo comandos permitidos",
     allowlistDesc: "La herramienta bash solo puede iniciar programas de la lista; se rechazan cadenas con programas no permitidos, redirecciones y backticks.",
     commands: "Programas permitidos",
-    commandsHint: "Un nombre de programa por línea o separado por comas.",
+    commandsHint:
+      "Solo el nombre del programa, sin ruta ni argumentos.",
     reset: "Restaurar valores predeterminados",
     workspace: "Escribir solo dentro del workspace",
     workspaceDesc: "write/edit fuera del workspace se rechazan.",
     note: "Es una política, no una sandbox del sistema. Tu terminal sigue libre; node, python y pnpm aún pueden mucho.",
+    add: "nuevo",
+    addCommand: "Añadir programa",
+    addPlaceholder: "programa…",
+    invalidCommand: "Solo letras, dígitos, punto, guion bajo, más y guion.",
+    removeCommand: "Quitar {command}",
   },
 
   workspacePicker: {

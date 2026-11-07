@@ -121,7 +121,6 @@ export const de = {
     stale: "{count} nie benutzte, alte Einträge",
       classWork: "Arbeit",
       classPrivate: "vertraulich",
-      classOwn: "eigene Notiz",
       classHint: "Wohin die Notiz gehört. Vertrauliche Notizen werden nie in eine Datei, einen Bericht oder eine Antwort geschrieben.",
       classLabel: "Sphäre",
   },
@@ -585,11 +584,17 @@ export const de = {
     allowlist: "Nur erlaubte Befehle",
     allowlistDesc: "Das Bash-Werkzeug darf nur Programme aus der Liste starten; Verkettung mit nicht erlaubten Programmen, Umleitungen und Backticks werden abgelehnt.",
     commands: "Erlaubte Programme",
-    commandsHint: "Ein Programmname pro Zeile oder durch Komma getrennt.",
+    commandsHint:
+      "Nur der Programmname, ohne Pfad und ohne Argumente.",
     reset: "Standard wiederherstellen",
     workspace: "Nur im Workspace schreiben",
     workspaceDesc: "write/edit außerhalb des Arbeitsverzeichnisses werden abgelehnt.",
     note: "Das ist eine Policy, keine OS-Sandbox. Dein Terminal bleibt frei; node, python und pnpm können weiterhin viel.",
+    add: "neu",
+    addCommand: "Programm hinzufügen",
+    addPlaceholder: "Programm…",
+    invalidCommand: "Nur Buchstaben, Ziffern, Punkt, Unterstrich, Plus und Bindestrich.",
+    removeCommand: "{command} entfernen",
   },
 
   workspacePicker: {

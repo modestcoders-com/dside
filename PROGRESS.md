@@ -4636,3 +4636,45 @@ entscheidet also selbst, nicht nur der Begleiter.
 
 Offen: ein Freizeit-/Neugier-System wie in peer² (eigenes Regal mit Verfolgung) ist hier nur die
 kleine Form `own`. Kein Version-Bump.
+
+## 110. Nur zwei Sphären, Richtlinien als Chips, ein Menü das nicht verschwindet (2026-11-07)
+
+Nach Rückmeldung des Nutzers, in drei Punkten.
+
+### Die dritte Sphäre gehört nicht hierher
+`own` ist wieder raus. DS.IDE ist das öffentliche Produkt für DeepSeek und wird
+geschäftsmäßig gehalten; ein Regal für die persönlichen Interessen des Begleiters ist der
+Spin-off peer², nicht dieses Projekt. `memories.class` kennt nur noch `work` und `private`,
+das CHECK ebenso. Eine Migration faltet eventuelle `own`-Zeilen (nur in einem unveröffentlichten
+Stand möglich) auf `work`; ein unbekannter Wert fällt auf `work` zurück, statt eine vierte
+Sphäre zu erfinden, die keine Abfrage kennt. Die vier Einordnungsfragen, das Schreibverbot für
+Vertrauliches und die beiden Persona-Regeln bleiben — die sind der Kern und nicht die Spielwiese.
+
+### Richtlinien: Chips statt Textfeld
+Übernommen aus peer² (`SandboxPanel.vue`): die erlaubten Programme stehen als gleich breite
+Chips, jedes mit einem ×, dazu ein gestrichelter „+ neu"-Knopf, der ein Eingabefeld an derselben
+Stelle öffnet. Siebzig Programmnamen in einem Textfeld waren nicht lesbar — man musste jede Zeile
+lesen, um zu sehen, was erlaubt ist. Jetzt sieht man die Liste auf einen Blick, Hinzufügen und
+Entfernen sind ein Klick, und ein Tippfehler wird während der Eingabe abgelehnt
+(`validCommand`: nur Buchstaben, Ziffern, Punkt, Unterstrich, Plus, Bindestrich — also genau das,
+was die Policy als Programmnamen akzeptiert). „Standard wiederherstellen" bleibt.
+
+Geprüft: 71 Chips aus den Standardwerten, Hinzufügen eines Duplikats ändert nichts, Entfernen
+funktioniert, `../evil` wird mit Meldung abgelehnt, „Standard" stellt alle 71 wieder her.
+
+### Das Kontomenü verschwand unter dem Agent-Panel
+Ursache war nicht die Breite, sondern `overflow: hidden` auf `.side-panel`: ein absolut
+positioniertes Kind wird am Panelrand abgeschnitten. Das Menü ist jetzt ein **fixes Popover**,
+dessen Koordinaten beim Öffnen aus der Position der Kontoschaltfläche berechnet werden
+(`toggleAccountMenu`), mit `width: max-content`, `min-width: 220px` und einem Deckel am
+Fensterrand. Es kann damit weder abgeschnitten werden noch aus dem Fenster laufen; bei schmalem
+Rand schiebt es sich über den Gesprächsbereich, statt zu verschwinden.
+
+Geprüft: bei 213 px breitem Rand reicht das Menü bis 239 px und ist vollständig sichtbar
+(Screenshot `/tmp/railmenu-zoom.png` vor dem Aufräumen).
+
+### Was bewusst nicht gebaut wurde
+- **Plugins bleiben in DS.IDE statisch** (feste Auswahl, der Begleiter entwirft keine eigenen).
+  Der Mechanismus für mitgelieferte Skills existiert; ein Marktplatz ist ein anderes Produkt.
+- **MCP-Client**: eigenes Vorhaben, braucht eine Spec (Transport, Freigaben, Werkzeug-Namensraum,
+  Sichtbarkeit im Panel). Nicht nebenbei.

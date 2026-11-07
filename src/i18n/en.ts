@@ -122,7 +122,6 @@ export const en: Messages = {
     stale: "{count} long-unused entries",
       classWork: "work",
       classPrivate: "confidential",
-      classOwn: "own note",
       classHint: "Which sphere the note belongs to. Confidential notes are never written into a file, a report or an answer.",
       classLabel: "Sphere",
   },
@@ -584,11 +583,17 @@ export const en: Messages = {
     allowlist: "Only allowed commands",
     allowlistDesc: "The bash tool may only start programs from the list; chains with disallowed programs, redirection and backticks are rejected.",
     commands: "Allowed programs",
-    commandsHint: "One program name per line or separated by commas.",
+    commandsHint:
+      "The program name only — no path, no arguments.",
     reset: "Restore defaults",
     workspace: "Write only inside the workspace",
     workspaceDesc: "write/edit outside the workspace are rejected.",
     note: "This is a policy, not an OS sandbox. Your terminal stays free; node, python and pnpm can still do a lot.",
+    add: "new",
+    addCommand: "Add a program",
+    addPlaceholder: "program…",
+    invalidCommand: "Letters, digits, dot, underscore, plus and hyphen only.",
+    removeCommand: "Remove {command}",
   },
 
   workspacePicker: {

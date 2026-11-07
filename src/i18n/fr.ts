@@ -121,7 +121,6 @@ export const fr: Messages = {
     stale: "{count} entrées anciennes jamais utilisées",
       classWork: "travail",
       classPrivate: "confidentiel",
-      classOwn: "note personnelle",
       classHint: "À quelle sphère appartient la note. Les notes confidentielles ne sont jamais écrites dans un fichier, un rapport ou une réponse.",
       classLabel: "Sphère",
   },
@@ -583,11 +582,17 @@ export const fr: Messages = {
     allowlist: "Commandes autorisées uniquement",
     allowlistDesc: "L'outil bash ne démarre que les programmes de la liste ; les chaînes avec des programmes non autorisés, les redirections et les backticks sont refusées.",
     commands: "Programmes autorisés",
-    commandsHint: "Un nom de programme par ligne ou séparé par des virgules.",
+    commandsHint:
+      "Le nom du programme seulement — sans chemin ni arguments.",
     reset: "Rétablir les valeurs par défaut",
     workspace: "Écrire uniquement dans le workspace",
     workspaceDesc: "write/edit en dehors du workspace sont refusés.",
     note: "C'est une politique, pas un bac à sable système. Votre terminal reste libre ; node, python et pnpm peuvent encore beaucoup.",
+    add: "nouveau",
+    addCommand: "Ajouter un programme",
+    addPlaceholder: "programme…",
+    invalidCommand: "Lettres, chiffres, point, tiret bas, plus et tiret uniquement.",
+    removeCommand: "Retirer {command}",
   },
 
   workspacePicker: {
