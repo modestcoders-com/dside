@@ -4906,3 +4906,72 @@ auf, das im GNOME-SDK nicht existiert. Deshalb **git 2.56.0 mit `NO_RUST=1`**. D
   Nutzers (lokal bauen, dann taggen) kann er beim Release von Hand hochgeladen werden.
 - `flatpak-builder` braucht Netz für den git-Quelltext. Ein späterer Umzug auf eine gepinnte,
   mitgelieferte Quelle wäre reproduzierbarer.
+
+## 115. Drei Fragen zum Flatpak — und zwei echte Fehler darin (2026-11-08)
+
+### „Wieso Sandbox?"
+
+Weil Flatpak **eine** ist. Es gibt keine Variante ohne; die Frage ist nicht *ob*, sondern welche
+Rechte die App braucht und welche Funktionen drinnen noch tragen. Das erste Flatpak hatte zwei
+Löcher, die genau daran lagen — beide sind jetzt zu.
+
+### „Mein Chat ist leer"
+
+**Ursache:** Eine sandboxed App bekommt ein eigenes Datenverzeichnis
+(`~/.var/app/com.deepvibe.dside/data`). Die Flatpak-Installation war also eine **frische
+Installation** — eigene Datenbank, keine Sessions. Technisch korrekt, aber nicht das, was jemand
+erwartet, der die App schon benutzt hat.
+
+**Änderung:** Das Manifest bindet das übliche Verzeichnis ein
+(`--filesystem=xdg-data/com.deepvibe.ds-ide`), und `data_dir()` in `lib.rs` benutzt es, wenn die
+App unter Flatpak läuft. Damit: eine Datenbank, ein Verlauf, ein Gedächtnis, eine
+Einstellungsdatei. Alle vier Stellen, die vorher `app_data_dir()` fragten, gehen jetzt über diesen
+Helfer. Nur eine Installation sollte gleichzeitig laufen — beide schreiben dieselbe Datei; WAL und
+`busy_timeout` halten das aus, aber zwei Fenster mit einem Gespräch sind eine Verwechslung.
+
+**Geprüft:** Der Screenshot aus dem Sandkasten zeigt das Fenster mit dem **bestehenden** Verlauf
+(Projekt „TallyGrip", der Chat über den git-Fehler) — nicht eine leere Oberfläche.
+
+### „Keine Screenshots = blind"
+
+Das war der schwerste Punkt, und er war berechtigt: Ein Begleiter ohne Augen kann nicht sehen, was
+der Mensch sieht.
+
+**Ursache:** Im Sandkasten gibt es **kein** Aufnahmewerkzeug — `grim`, `spectacle`, `scrot`,
+`gnome-screenshot`, `import`, `magick` sind alle nicht Teil der Runtime. Die vier Versuche, die
+`capture_to` macht, konnten also nur scheitern.
+
+**Lösung:** das Desktop-Portal (`org.freedesktop.portal.Screenshot`), neu in `portal.rs`. Der
+Compositor macht das Bild, der Desktop entscheidet, die App bekommt eine Datei. Zwei Feinheiten,
+die den Weg bestimmt haben:
+
+- Die Antwort ist ein **gerichtetes Signal** an die eigene D-Bus-Verbindung. Ein `gdbus monitor`
+  in einem Kindprozess sieht sie nie — also muss die App selbst zuhören (`zbus`, das über die
+  Keyring-Anbindung ohnehin im Baum liegt).
+- Die Antwort kann **sofort** kommen. Deshalb wird zuerst abonniert und dann gefragt; möglich ist
+  das, weil `handle_token` den Pfad der Anfrage vorher festlegt. Ein Worker-Thread wartet mit
+  Zeitlimit, ein Handshake stellt sicher, dass die Regel steht, bevor die Anfrage rausgeht.
+
+Die Aufnahmekette versucht das Portal **zuerst**, wenn `FLATPAK_ID` oder `SNAP` gesetzt ist —
+vier Werkzeuge zu probieren, die es nicht gibt, kostet nur Zeit. Das Bild wird weiterhin auf
+„einfarbig" geprüft; ein schwarzes Rechteck als Erfolg zu melden wäre der Fehler, den der Check
+verhindert.
+
+**Geprüft** in einer **Debug**-Flatpak (die Testbrücke gibt es nur dort), im Sandkasten:
+`capture_screen` liefert 4,3 MB PNG, `identify` sagt **3840×1080 sRGB**, das Bild zeigt den
+wirklichen Schreibtisch. Log: `screenshot: captured through the desktop portal`. Ein echtes
+Bild, kein schwarzes.
+
+Der Desktop kann beim ersten Mal um Erlaubnis fragen („… wants to take screenshots"). Das ist
+seine Entscheidung, nicht unsere — ein Portal, das ohne Nachfrage alles herausgibt, wäre kein
+Portal.
+
+### Nebenbei: ein Dialog, der nicht uns gehörte
+Beim Testen erschien eine Berechtigungsabfrage, die „DeepVibe" nannte. Ursache: Mein
+Portal-Aufruf aus der Host-Shell wurde dem Elternprogramm zugeordnet. Ich habe ihn abgebrochen,
+statt eine Berechtigung zu erteilen, die nicht für DS·IDE gilt.
+
+### Geprüft
+`cargo test --lib` **90** / 14 ignoriert (neu: `a_file_uri_becomes_a_path` mit Leerzeichen und
+Umlauten). Flatpak gebaut, installiert, gestartet: Fenster öffnet, bestehender Verlauf da, kein
+Panic, `git ls-remote` und Screenshot im Sandkasten funktionieren.

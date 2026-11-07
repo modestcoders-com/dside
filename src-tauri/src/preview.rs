@@ -229,7 +229,7 @@ async fn respond(
     stream.flush().await
 }
 
-fn percent_decode(value: &str) -> String {
+pub(crate) fn percent_decode(value: &str) -> String {
     let bytes = value.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut index = 0;

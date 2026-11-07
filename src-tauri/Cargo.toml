@@ -41,8 +41,11 @@ keyring = { version = "3", features = [
 ] }
 
 # Only to probe for the appindicator library before the tray crate panics over it.
+# `zbus` is already in the tree (through the keyring backend); it is a direct dependency now
+# because screenshots inside a Flatpak have to go through the desktop portal.
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+zbus = "4"
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

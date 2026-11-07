@@ -20,6 +20,14 @@ finish-args:
   - --device=dri
   # The workspace is whatever folder the user picks; a narrower rule would refuse half of them.
   - --filesystem=home
+  # The data directory the AppImage and the deb also use. A sandboxed app normally gets its own
+  # (~/.var/app/<id>/data), which means a second installation opens with an empty conversation
+  # while the first still has it. The program resolves this path when it runs under Flatpak
+  # (`data_dir` in lib.rs), so both installations see one history.
+  - --filesystem=xdg-data/com.deepvibe.ds-ide:create
+  # Screenshots come from the desktop portal inside the sandbox; the tools the app would
+  # otherwise call are not part of the runtime.
+  - --talk-name=org.freedesktop.portal.Desktop
   # The API key lives in the OS keyring, and the app posts notifications.
   - --talk-name=org.freedesktop.secrets
   - --talk-name=org.freedesktop.Notifications

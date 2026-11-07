@@ -48,6 +48,8 @@ fn capture_png(app: &AppHandle) -> Result<Vec<u8>, String> {
         .app_data_dir()
         .map_err(|error| error.to_string())?
         .join("screenshots");
+    // (`app_data_dir` on purpose: a screenshot is a transient of this installation and does not
+    // belong in the shared directory the database lives in.)
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
 
     let stamp = SystemTime::now()
@@ -254,6 +256,12 @@ fn capture_candidates(wayland: bool) -> Vec<(&'static str, &'static [&'static st
     }
 }
 
+/// Is this build running inside a sandbox? Flatpak sets `FLATPAK_ID`, Snap sets `SNAP`.
+#[cfg(target_os = "linux")]
+pub(crate) fn in_sandbox() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some() || std::env::var_os("SNAP").is_some()
+}
+
 /// Wayland is identified by either signal: a nested compositor may not set the session type,
 /// and a session can carry XDG_SESSION_TYPE while still only having a Wayland socket.
 #[cfg(target_os = "linux")]
@@ -318,6 +326,28 @@ fn capture_to(path: &Path) -> Result<(), String> {
 
     let mut flat: Vec<&str> = Vec::new();
     let mut failed: Vec<&str> = Vec::new();
+
+    // A sandbox has no capture tool: the portal is the only way out, and it is the sanctioned
+    // one — the compositor takes the picture and the desktop decides. Tried first there,
+    // because a tool that does not exist is not worth four failed attempts.
+    #[cfg(target_os = "linux")]
+    if in_sandbox() {
+        match crate::portal::screenshot(path) {
+            Ok(()) => {
+                crate::log_line!("screenshot: captured through the desktop portal");
+                if !is_a_flat_image(path) {
+                    return Ok(());
+                }
+                crate::log_line!("screenshot: the portal produced an empty image, ignored");
+                flat.push("portal");
+            }
+            Err(error) => {
+                crate::log_line!("screenshot: portal: {error}");
+                failed.push("portal");
+            }
+        }
+    }
+
     for (program, args) in &candidates {
         match attempt(program, args, path) {
             Attempt::Captured => {

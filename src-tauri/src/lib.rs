@@ -14,6 +14,8 @@ mod git_panel;
 mod logs;
 mod memory_check;
 mod preview;
+#[cfg(target_os = "linux")]
+mod portal;
 mod pty;
 mod secret;
 mod skills;
@@ -844,6 +846,30 @@ pub(crate) fn base64_encode(bytes: &[u8]) -> String {
     out
 }
 
+/// Where the app keeps its state: database, attachments, screenshots, the secret fallback.
+///
+/// A packaged build normally gets its own directory — Flatpak points at
+/// `~/.var/app/<id>/data`. That is right for isolation and wrong for a user who already ran the
+/// AppImage: two installations, two empty conversations, and the honest question why the chat
+/// is gone. So the sandboxed build uses the same directory as the other one; the manifest mounts
+/// it (`--filesystem=xdg-data/com.deepvibe.ds-ide`).
+///
+/// Only one of them should run at a time. Both write the same SQLite file, and while WAL and a
+/// busy timeout keep that from breaking, two windows fighting over one conversation is a
+/// misunderstanding waiting to happen.
+pub fn data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    if std::env::var_os("FLATPAK_ID").is_some() {
+        if let Some(home) = std::env::var_os("HOME") {
+            let shared = std::path::PathBuf::from(home)
+                .join(".local/share/com.deepvibe.ds-ide");
+            if shared.is_dir() || std::fs::create_dir_all(&shared).is_ok() {
+                return Ok(shared);
+            }
+        }
+    }
+    app.path().app_data_dir().map_err(|error| error.to_string())
+}
+
 /// Puts the project into the window title. Several instances can be open at once, and the
 /// task bar lists them by title — "DS·IDE" twice tells the user nothing about which is which.
 /// A window without a project keeps the plain name.
@@ -1054,11 +1080,8 @@ fn diagnostics(app: AppHandle) -> DiagnosticsInfo {
         })
         .unwrap_or_default();
 
-    let database = app
-        .path()
-        .app_data_dir()
-        .ok()
-        .map(|directory| directory.join("ds-ide.sqlite3"));
+    // The same directory the app actually uses, not the one the platform suggests.
+    let database = data_dir(&app).ok().map(|directory| directory.join("ds-ide.sqlite3"));
     let database_path = database
         .as_ref()
         .map(|path| path.to_string_lossy().to_string())
@@ -1238,7 +1261,7 @@ pub fn run() {
         .manage(test_bridge::TestBridgeState::default())
         .manage(tray::TrayState::default())
         .setup(|app| {
-            let directory = app.path().app_data_dir()?;
+            let directory = data_dir(app.handle())?;
             let database = db::Db::open(&directory.join("ds-ide.sqlite3"))?;
             app.manage(database);
             app.manage(secret::SecretStore::new(directory.join("secrets.json")));
