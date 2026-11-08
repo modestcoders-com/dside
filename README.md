@@ -5,7 +5,8 @@
 An agentic desktop IDE on **Tauri v2** (no Electron) with **DeepSeek** as the model — and a partner inside it, not just a tool. The partner chooses its own name, once; until it does, it goes by the placeholder **Seeky**. It is called **Ziggy** now.
 
 > The authoritative status, every design decision and the open list live in
-> [PROGRESS.md](./PROGRESS.md) — not in this file.
+> [PROGRESS.md](./PROGRESS.md) — not in this file. What is still open lives in
+> [TODO.md](./TODO.md).
 
 ![DS·IDE in Chinese: chat, work area with the README, and the file tree](docs/dside_050.webp)
 
