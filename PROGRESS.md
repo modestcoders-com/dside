@@ -5084,5 +5084,21 @@ das war der Punkt, an dem sie vorher ununterscheidbar waren. Ein Prozess mit meh
 ist eine eigene Architektur; „zweiten Start abweisen" würde gegen den Projekt-Workflow
 arbeiten. Steht als Entscheidung in `TODO.md`, nicht als Fehler.
 
+### Die Flatpak nannte sich 0.6.1
+Der Bundle enthielt die richtige Binary — derselbe Hash wie der Release-Build —, aber `flatpak info`
+meldete **0.6.1**. AppStream liest die Version aus `com.deepvibe.dside.metainfo.xml`, nicht aus dem
+Programm; die `<release>`-Zeile war beim Versionssprung stehen geblieben. Aufgefallen ist es nur,
+weil das Paket vor dem Tag gestartet wurde — auf der Release-Seite wäre es eine falsche
+Versionsangabe gewesen, die niemand mehr mit dem Build verbindet.
+
+Die Zeile ist nachgezogen, und `build.sh` vergleicht jetzt die oberste Release-Zeile mit
+`package.json` und bricht bei Abweichung ab. Die Metainfo bleibt von Hand gepflegt, weil sie die
+Release-Historie trägt; der Vergleich verhindert nur, dass sie stillschweigend veraltet.
+
 ### Geprüft
 `cargo test --lib` **91** / 14 ignoriert, `pnpm build` grün (521 Schlüssel), `check:private` sauber.
+Alle vier Pakete gebaut **und gestartet**: `.deb` entpackt und die Binary mit eigenem
+Datenverzeichnis unter `/tmp` gestartet, `.rpm` auf Inhalt geprüft (Binary, Desktop-Datei, drei
+Icon-Größen), AppImage entsperrt und gestartet, Flatpak installiert → `flatpak info` **0.6.2**,
+Fenster aufgebaut. Die Flatpak lief auf dem gewohnten Datenverzeichnis, damit die gemeinsame
+Historie sichtbar bleibt.

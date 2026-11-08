@@ -14,6 +14,15 @@ REPO="$ROOT/target/flatpak/repo"
 STATE="$ROOT/target/flatpak/state"
 OUT="$ROOT/target/flatpak/DS-IDE-${VERSION}-x86_64.flatpak"
 
+# `flatpak info` reads the version from the AppStream file, not from the binary. A stale line
+# here announced a 0.6.2 build as 0.6.1; refuse to package that again.
+META="$ROOT/packaging/flatpak/com.deepvibe.dside.metainfo.xml"
+META_VERSION="$(sed -n 's/.*<release version="\([^"]*\)".*/\1/p' "$META" | head -1)"
+if [ "$META_VERSION" != "$VERSION" ]; then
+  echo "metainfo says ${META_VERSION:-nothing}, package.json says $VERSION — add a <release> line first" >&2
+  exit 1
+fi
+
 cd "$ROOT"
 pnpm build
 (
