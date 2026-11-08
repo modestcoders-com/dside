@@ -3,23 +3,6 @@
 What is left, in the order I would do it. `PROGRESS.md` is the record of what happened;
 this file is the list of what has not.
 
-## Waiting for a decision
-
-- **0.6.2 — patch release.** Everything below under "ready" is on `main`: the reversed
-  `is_error` flag, `grep` on a single file, the command scanner, the shared data directory and
-  the tray icon in the Flatpak, the portal screenshots. `0.6.1` carries two of these bugs in
-  published builds. Order agreed with the maintainer: build deb/rpm/AppImage and the Flatpak
-  **locally, start them**, and only then set the tag — a tag starts the macOS and Windows builds,
-  which cannot be checked here.
-
-## Done in 0.6.2
-
-- **The answer time is a setting** (*Policies → Antwortzeit*, 1–60 minutes, default 5). The
-  engine clamps it to 30 s – 60 min, and the countdown in the chat panel reads the same value, so
-  the promise and the wait cannot disagree.
-- **The Flatpak is built and attached by CI** (a `flatpak` job on `ubuntu-24.04` with pnpm 10,
-  for the reasons diagnosed in §117), and the `.flatpak` lands on the release page.
-
 ## Ready, small, no design needed
 
 *Nothing left here at the moment.*
