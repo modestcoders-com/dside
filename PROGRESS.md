@@ -5024,7 +5024,7 @@ leer. Das Panel kann die Datei also nicht öffnen, zeigt aber den Eintrag: Menü
 ### Änderung
 - **`temp_dir_path`**: Das Icon wird nach `~/.cache/ds-ide/tray/` geschrieben. Das Home ist im
   Manifest geteilt, also kann das Panel die Datei lesen. Am Bus sichtbar:
-  `IconName = /home/me/.cache/ds-ide/tray/tray-icon-dside-tray-0.png`.
+  `IconName = ~/.cache/ds-ide/tray/tray-icon-dside-tray-0.png`.
 - **Eingebettetes Symbol statt Fenster-Icon.** Der Pfad über `default_window_icon()` war nicht
   die Ursache (Log: „window icon: true"), aber ein eingebettetes PNG macht die Anzeige
   unabhängig vom Fensterzustand. Dafür `tauri`-Feature `image-png`.
