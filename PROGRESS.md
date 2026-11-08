@@ -4975,3 +4975,38 @@ statt eine Berechtigung zu erteilen, die nicht für DS·IDE gilt.
 `cargo test --lib` **90** / 14 ignoriert (neu: `a_file_uri_becomes_a_path` mit Leerzeichen und
 Umlauten). Flatpak gebaut, installiert, gestartet: Fenster öffnet, bestehender Verlauf da, kein
 Panic, `git ls-remote` und Screenshot im Sandkasten funktionieren.
+
+## 116. Flatpak: das Tray-Icon ist jetzt dabei (2026-11-08)
+
+Nachfrage: „Flatpak classic können wir gar nicht selbst auslösen?" Es gibt keinen
+classic-Modus — Flatpak **ist** die Sandbox, und die Rechte sind die eigenen, weil wir das
+Bundle selbst bauen und verteilen. Das Maximum wäre `--filesystem=host`; das haben wir **nicht**
+genommen, weil es den einzigen Vorteil der Verpackung aufgibt und keines der Löcher stopft.
+
+Stattdessen die Ursache beseitigt: Die GNOME-Runtime hat **gar keine** Tray-Kette — kein
+`libayatana-indicator`, kein `libdbusmenu`, kein `appindicator`. Nachgemessen in der Runtime:
+von sechs geprüften Bibliotheken sind nur `libgtk-3` und `libwebkit2gtk-4.1` vorhanden.
+
+**Änderung:** `flathub/shared-modules/libayatana-appindicator` (mit `intltool`) unverändert
+mitgeliefert (`packaging/flatpak/shared-modules/`, 20 KB Manifeste und Patches) und als erstes
+Modul eingetragen. Vier C-Module, gebaut im Sandkasten.
+
+### Geprüft — dreifach, nicht behauptet
+1. Log beim Start: **`tray: icon installed`** (vorher: „not available").
+2. Auf dem Sitzungsbus: `RegisteredStatusNotifierItems` enthält
+   `…/org/ayatana/NotificationItem/tray_icon_tray_app_dside_tray`, und
+   `IsStatusNotifierHostRegistered = true`.
+3. **Fenster schließen** über den App-eigenen Weg (Debug-Bridge `POST /close`): Prozessanzahl
+   vorher 1, nachher 1, Log **`window: hidden to the tray`**. Die App läuft weiter — und damit
+   auch die Erinnerungen.
+
+Die Bibliotheken liegen im Bundle (`/app/lib/libayatana-appindicator3.so.1`,
+`/app/lib/libdbusmenu-gtk3.so`), sind also nicht vom Host geliehen.
+
+### Damit ist der Stand
+Screenshots (Portal, echtes 3840×1080-PNG), git über HTTPS, Terminal, Shell des Begleiters,
+geteilter Verlauf mit der AppImage, Tray-Icon und Weiterlaufen im Hintergrund — alles im
+Sandkasten geprüft. Der Unterschied zur AppImage: Der Desktop kann beim ersten Screenshot um
+Erlaubnis fragen, und das ist seine Entscheidung.
+
+`cargo test --lib` 90 / 14 ignoriert.

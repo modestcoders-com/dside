@@ -36,6 +36,12 @@ finish-args:
   - --talk-name=org.freedesktop.portal.OpenURI
 
 modules:
+  # The tray chain. The GNOME runtime has none of it, and without it the app cannot keep
+  # running after the window closes — which is what reminders need. Vendored from
+  # flathub/shared-modules (MIT/LGPL, unmodified) so the build does not depend on a network
+  # checkout of somebody else's branch.
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
   # git is not in the GNOME runtime, and an IDE without its version control is half an IDE.
   # Built here from source so the git panel, the terminal and the companion's shell all find
   # it; the runtime supplies zlib, curl and openssl it links against.
