@@ -88,9 +88,26 @@ pub fn install(app: &AppHandle) -> bool {
             }
         });
 
-    // The window icon is already bundled; reusing it keeps the tray looking like the app.
-    if let Some(icon) = app.default_window_icon().cloned() {
-        builder = builder.icon(icon);
+    // The tray crate writes the icon as a PNG and passes its **path** to the panel as the icon
+    // name. In a sandbox that path is a private `/run/user/…/tray-icon/…` the desktop cannot
+    // open, so the entry exists with a working menu and an empty slot — exactly what a Flatpak
+    // build showed. The file therefore goes into the cache directory under the home, which the
+    // manifest shares with the host.
+    if let Some(dir) = tray_icon_dir() {
+        builder = builder.temp_dir_path(dir);
+    }
+
+    // The icon is embedded, not taken from the window: `default_window_icon()` was empty in the
+    // packaged build, and a tray entry without a picture is a blank slot in the panel.
+    // The mark itself, transparent: a square app icon reads as a dark sticker in a panel.
+    match tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png")) {
+        Ok(icon) => builder = builder.icon(icon),
+        Err(error) => {
+            crate::log_line!("tray: embedded icon unreadable: {error}");
+            if let Some(icon) = app.default_window_icon().cloned() {
+                builder = builder.icon(icon);
+            }
+        }
     }
 
     match builder.build(app) {
@@ -103,7 +120,11 @@ pub fn install(app: &AppHandle) -> bool {
                 *slot = Some(quit);
             }
             state.running.store(true, Ordering::SeqCst);
-            crate::log_line!("tray: icon installed");
+            crate::log_line!(
+                "tray: icon installed (embedded: {}, window icon: {})",
+                true,
+                app.default_window_icon().is_some()
+            );
             true
         }
         Err(error) => {
@@ -111,6 +132,15 @@ pub fn install(app: &AppHandle) -> bool {
             false
         }
     }
+}
+
+/// Where the tray icon file goes: inside the home, so the desktop's panel can read it. Outside a
+/// sandbox the runtime directory would do, but there is no reason for two code paths.
+fn tray_icon_dir() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let dir = std::path::PathBuf::from(home).join(".cache/ds-ide/tray");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir)
 }
 
 /// Can this environment show a tray icon at all?

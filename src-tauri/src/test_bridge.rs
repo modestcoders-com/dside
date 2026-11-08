@@ -108,6 +108,12 @@ async fn handle(app: AppHandle, mut stream: TcpStream) {
         // Closing the way the titlebar button does: Tauri's own close(), so the registered
         // CloseRequested handler runs. xdotool destroys the X11 window instead, which bypasses
         // every handler and kills the process — fine for a real crash, useless as a test.
+        // The tray's own quit path: `app.exit` tears the indicator down, which a signal does
+        // not. Needed to check that a normal quit leaves nothing behind in the panel.
+        ("POST", "/quit") => {
+            app.exit(0);
+            (200, "application/json", "{\"ok\":true}".to_string())
+        }
         ("POST", "/close") => match app.get_webview_window("main") {
             Some(window) => match window.close() {
                 Ok(()) => (200, "application/json", "{\"ok\":true}".to_string()),

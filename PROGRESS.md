@@ -5010,3 +5010,40 @@ Sandkasten geprüft. Der Unterschied zur AppImage: Der Desktop kann beim ersten 
 Erlaubnis fragen, und das ist seine Entscheidung.
 
 `cargo test --lib` 90 / 14 ignoriert.
+
+## 117. Das Tray-Icon war unsichtbar, weil der Dateipfad im Sandkasten lag (2026-11-08)
+
+Gemeldet: Das Menü des Tray-Symbols funktionierte, das Symbol selbst war unsichtbar.
+
+### Ursache, gemessen statt vermutet
+`tray-icon` schreibt das Bild als PNG und übergibt dem Panel den **absoluten Pfad** als
+`IconName`. Abfrage am Sitzungsbus: `IconName = /run/user/1000/tray-icon/tray-icon-dside-tray-0.png`.
+Der Pfad gehört dem **privaten** `/run/user/1000` des Sandkastens — im Host ist derselbe Ordner
+leer. Das Panel kann die Datei also nicht öffnen, zeigt aber den Eintrag: Menü ja, Bild nein.
+
+### Änderung
+- **`temp_dir_path`**: Das Icon wird nach `~/.cache/ds-ide/tray/` geschrieben. Das Home ist im
+  Manifest geteilt, also kann das Panel die Datei lesen. Am Bus sichtbar:
+  `IconName = /home/me/.cache/ds-ide/tray/tray-icon-dside-tray-0.png`.
+- **Eingebettetes Symbol statt Fenster-Icon.** Der Pfad über `default_window_icon()` war nicht
+  die Ursache (Log: „window icon: true"), aber ein eingebettetes PNG macht die Anzeige
+  unabhängig vom Fensterzustand. Dafür `tauri`-Feature `image-png`.
+- **Das Logo statt des App-Icons**: ein 64 × 64 transparentes PNG aus `DS-icon-blue.png`
+  (`src-tauri/icons/tray.png`). Das quadratische App-Icon wirkte im Panel wie ein dunkler
+  Aufkleber.
+
+### Geprüft
+- `IconName` zeigt auf das Home, die Datei existiert dort (`9632 B`).
+- Panel-Foto: der blaue Wal ist sichtbar, transparent, an der erwarteten Stelle.
+- Ein Start = **ein** Eintrag; sauberes Beenden über den Tray-Weg (`POST /quit` im
+  Debug-Bridge → `app.exit`) entfernt ihn wieder (5 → 4 → 0 nach dem Aufräumen).
+
+### Dabei gelernt: `pkill` trifft den Sandkasten nicht
+Alle meine Abbrüche während der Tests hatten `pkill -f com.deepvibe.dside` benutzt — das beendet
+den `flatpak run`-Wrapper, **nicht** die App: Im Sandkasten heißt der Prozess nur `DSIDE`, und
+`bwrap` hält ihn am Leben. Folge: fünf Instanzen liefen gleichzeitig, jede mit einem eigenen
+Tray-Eintrag — das erklärte die „Leichen" im Panel, die auch ein Neustart von `plasmashell`
+nicht wegräumte (sie waren echte, lebende Prozesse). Richtig ist `flatpak kill com.deepvibe.dside`.
+Nach dem Aufräumen: keine Instanz, keine Tray-Einträge.
+
+`cargo test --lib` 90 / 14 ignoriert.
