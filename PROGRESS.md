@@ -5130,3 +5130,14 @@ von GitHub, nicht Code. Der Lauf wird mit demselben Stand wiederholt.
 ### Der Tag wandert
 Weil der erste Lauf auf dem alten Stand lief, wird `v0.6.2` auf beiden Remotes gelöscht und auf
 den korrigierten Commit gesetzt; ein Entwurf mit halben Assets bleibt nicht stehen.
+
+### Der Windows-Job fiel aus, nicht der Code
+Der Job brach viermal an derselben Stelle ab, jedes Mal beim Herunterladen einer
+Tauri-Hilfsdatei: `AppRun-x86_64`, `nsis-3.11.zip`, `nsis_tauri_utils-v0.5.3.dll` — jeweils
+`http status: 504` von github.com. Weltweit gemeldet, während die Statusseite „grün" meldete.
+Der Build selbst war jedes Mal vorher fertig (`Built application at: DSIDE.exe`). Nach dem
+Abklingen der Störung lief derselbe Job ohne Änderung durch.
+
+`attach` hat währenddessen einen Entwurf mit sechs von acht Dateien geschrieben. Der wurde erst
+veröffentlicht, als alle acht da waren: deb, rpm, AppImage, linux-tar.gz, dmg, `.exe` und Flatpak.
+Version `v0.6.2`, `latest`, 8 Assets.
