@@ -594,6 +594,9 @@ export const es: Messages = {
     addPlaceholder: "programa…",
     invalidCommand: "Solo letras, dígitos, punto, guion bajo, más y guion.",
     removeCommand: "Quitar {command}",
+    askTimeout: "Tiempo de respuesta",
+    askTimeoutDesc: "Cuánto espera una pregunta o una aprobación antes de que el turno se abandone.",
+    minutes: "minutos",
   },
 
   workspacePicker: {

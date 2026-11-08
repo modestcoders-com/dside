@@ -12,20 +12,26 @@ this file is the list of what has not.
   **locally, start them**, and only then set the tag — a tag starts the macOS and Windows builds,
   which cannot be checked here.
 
+## Done in 0.6.2
+
+- **The answer time is a setting** (*Policies → Antwortzeit*, 1–60 minutes, default 5). The
+  engine clamps it to 30 s – 60 min, and the countdown in the chat panel reads the same value, so
+  the promise and the wait cannot disagree.
+- **The Flatpak is built and attached by CI** (a `flatpak` job on `ubuntu-24.04` with pnpm 10,
+  for the reasons diagnosed in §117), and the `.flatpak` lands on the release page.
+
 ## Ready, small, no design needed
 
-- **The question window's deadline is hardcoded** (five minutes, `ASK_TIMEOUT` in
-  `engine/mod.rs`). It is now visible as a countdown and the typed text survives expiry, but the
-  length is a guess. Belongs in the settings.
-- **Screenshot of the browser window only.** `screenshot` captures the whole desktop; a page the
-  companion opened cannot be photographed on its own.
-- **Single instance.** Two windows can run at once and share one database (WAL and the busy
-  timeout keep it from breaking, but two views of one conversation invite confusion). Either
-  refuse the second start or make the windows distinguishable — see the next point.
-- **The `.flatpak` is not attached to a release** and CI does not build it. Building it locally
-  and uploading it by hand is the agreed path for now.
-- **`flatpak-builder` fetches the git source from the network.** A pinned, vendored source would
-  make the build reproducible offline.
+*Nothing left here at the moment.*
+
+## Wanted, needs a decision (not a defect)
+
+- **One instance with several windows** ("Window 1: <project>"), listed once in the task bar.
+  Today several instances are allowed and share one database — verified with five at once, the
+  history stayed intact. The title carries the project, which is what made them
+  indistinguishable before. Whether to refuse a second start, or to grow into one process with
+  several windows, is a product decision: the second is a multi-window architecture, the first
+  would fight the per-project workflow.
 
 ## Needs a spec first
 
@@ -34,8 +40,6 @@ this file is the list of what has not.
   what it may do, how it is enabled per project.
 - **MCP client.** The user configures servers; nothing is shipped fixed. Needs: transport,
   permission model, tool namespace, how servers appear in the panel.
-- **Several windows in one instance**, listed as "Window 1: <project>" in the task bar. A
-  multi-window architecture with state per webview, not a parameter.
 - **Verifier that may run `bash` read-only.** Needs a classification of commands by read effect;
   the permission model alone cannot answer it.
 

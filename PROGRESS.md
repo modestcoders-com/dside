@@ -5047,3 +5047,42 @@ nicht wegräumte (sie waren echte, lebende Prozesse). Richtig ist `flatpak kill 
 Nach dem Aufräumen: keine Instanz, keine Tray-Einträge.
 
 `cargo test --lib` 90 / 14 ignoriert.
+
+## 118. Die Antwortzeit ist einstellbar, die Flatpak kommt aus dem CI (2026-11-08)
+
+Vier Punkte von der offenen Liste, drei davon erledigt, einer davon war bereits erledigt.
+
+### Die Fünf-Minuten-Frist ist jetzt eine Einstellung
+`ASK_TIMEOUT` war eine Konstante. Jetzt: `askTimeoutSeconds` in der Engine-Konfiguration,
+geklemmt auf 30 s … 60 min (`ask_timeout`), ein Zahlenfeld **Richtlinien → Antwortzeit**
+(1–60 Minuten, Standard 5), und der Countdown im Chat liest **denselben** Wert — Versprechen und
+Wartezeit können nicht mehr auseinanderlaufen.
+
+Der Grund, warum das wichtig ist: Die Zahl war eine Annahme über die Aufmerksamkeit eines
+Menschen. Nur der Mensch weiß, ob er kurz weg war oder gerade liest.
+
+Geprüft: Feld auf 12 gesetzt → `settings_all` speichert 12 → der Countdown zeigt **12:00**.
+Test `the_answer_wait_is_clamped` (300 → 300 s, 0 → 30 s, 100 000 → 3600 s).
+
+### Der Fenster-Screenshot existierte schon
+Er stand auf meiner Liste als „fehlt". Ist falsch: `screenshot` nimmt seit Runde 60 einen
+`window`-Parameter, und `capture_window` schneidet das Fenster aus der Desktop-Aufnahme.
+Live geprüft: Browserfenster geöffnet, `capture_window("browser-1")` → `window: true`,
+„cropped to the window at 0,0 (1120×840)". Die Liste war der Fehler, nicht der Code.
+
+### Die Flatpak wird jetzt gebaut und veröffentlicht
+Neuer CI-Job `flatpak` auf **`ubuntu-24.04`** mit **pnpm 10**. Beides ist die Ursache der
+peer²-Ausfälle, hier vorab vermieden: `ubuntu-22.04` hat einen `flatpak-builder`, der
+`appstream-compose` aufruft — im GNOME-50-SDK heißt das `appstreamcli` —, und pnpm 12 ignoriert
+`pnpm.overrides`, woran `--frozen-lockfile` scheitert. `attach` hängt jetzt an `[build, flatpak]`
+und lädt `*.flatpak` mit hoch; ein gescheitertes Paket blockiert das Release, statt still zu
+fehlen.
+
+### Mehrere Instanzen: entschieden, nicht gebaut
+Sie bleiben erlaubt. Sie teilen eine Datenbank, und der Fenstertitel trägt das Projekt — genau
+das war der Punkt, an dem sie vorher ununterscheidbar waren. Ein Prozess mit mehreren Fenstern
+ist eine eigene Architektur; „zweiten Start abweisen" würde gegen den Projekt-Workflow
+arbeiten. Steht als Entscheidung in `TODO.md`, nicht als Fehler.
+
+### Geprüft
+`cargo test --lib` **91** / 14 ignoriert, `pnpm build` grün (521 Schlüssel), `check:private` sauber.

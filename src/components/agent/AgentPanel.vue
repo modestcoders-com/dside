@@ -5,6 +5,7 @@ import MessageList from "./MessageList.vue";
 import Composer from "./Composer.vue";
 import { t } from "../../i18n";
 import { activeSessionId, messages } from "../../stores/sessions";
+import { settings } from "../../stores/settings";
 import {
   answerAction,
   historyHasMore,
@@ -42,13 +43,16 @@ const freeAnswer = ref("");
  * steps away for a moment comes back to a card that is already dead. The countdown makes the
  * deadline visible before it matters.
  */
-const ASK_SECONDS = 300;
-const secondsLeft = ref(ASK_SECONDS);
+/** The wait the engine was told to use, so the countdown cannot promise a different deadline. */
+const askSeconds = computed(() =>
+  Math.max(30, Math.min(3600, Math.round(settings.askTimeoutMinutes * 60))),
+);
+const secondsLeft = ref(askSeconds.value);
 let askTimer: number | undefined;
 
 function startCountdown(): void {
   window.clearInterval(askTimer);
-  secondsLeft.value = ASK_SECONDS;
+  secondsLeft.value = askSeconds.value;
   askTimer = window.setInterval(() => {
     secondsLeft.value = Math.max(0, secondsLeft.value - 1);
     if (secondsLeft.value === 0) window.clearInterval(askTimer);

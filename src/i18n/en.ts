@@ -597,6 +597,9 @@ export const en: Messages = {
     addPlaceholder: "program…",
     invalidCommand: "Letters, digits, dot, underscore, plus and hyphen only.",
     removeCommand: "Remove {command}",
+    askTimeout: "Answer time",
+    askTimeoutDesc: "How long a question or an approval waits for an answer before the turn gives up.",
+    minutes: "minutes",
   },
 
   workspacePicker: {

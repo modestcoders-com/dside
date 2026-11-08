@@ -384,6 +384,7 @@ mod live {
             reasoning_effort: None,
             context_window: None,
             disabled_tools: Vec::new(),
+            ask_timeout_seconds: 300,
         })
     }
 

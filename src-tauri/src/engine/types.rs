@@ -44,6 +44,17 @@ pub struct EngineConfig {
     /// anyway is refused instead of quietly running.
     #[serde(default)]
     pub disabled_tools: Vec<String>,
+    /// How long a question or an approval waits for the user. Five minutes is a guess about
+    /// somebody's attention; the setting exists because only the person knows whether they
+    /// stepped away or are still reading.
+    #[serde(default = "default_ask_timeout")]
+    pub ask_timeout_seconds: u64,
+}
+
+/// Five minutes: long enough to answer a question, short enough that a forgotten one does not
+/// block a turn for the rest of the day.
+fn default_ask_timeout() -> u64 {
+    300
 }
 
 fn default_base_url() -> String {

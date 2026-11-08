@@ -598,6 +598,9 @@ export const de = {
     addPlaceholder: "Programm…",
     invalidCommand: "Nur Buchstaben, Ziffern, Punkt, Unterstrich, Plus und Bindestrich.",
     removeCommand: "{command} entfernen",
+    askTimeout: "Antwortzeit",
+    askTimeoutDesc: "Wie lange eine Rückfrage oder Freigabe auf eine Antwort wartet, bevor der Zug abbricht.",
+    minutes: "Minuten",
   },
 
   workspacePicker: {

@@ -194,6 +194,8 @@ export async function configureEngine(): Promise<void> {
       browserControl: settings.browserControl,
       maxTurns: 24,
       reasoningEffort: settings.reasoningEffort || null,
+      // The countdown in the chat panel reads the same value, so the promise and the wait agree.
+      askTimeoutSeconds: Math.max(30, Math.min(3600, Math.round(settings.askTimeoutMinutes * 60))),
       // Compression needs the window to know when a conversation is too long.
       contextWindow: modelChoices().find((entry) => entry.id === settings.model)?.contextWindow ?? null,
       // Everyday mode takes the shell, code review and sub-agents away from the partner.

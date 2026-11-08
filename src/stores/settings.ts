@@ -38,6 +38,8 @@ export interface SettingsState {
   keepInBackground: boolean;
   /** How hard the model should think, on the provider's own scale. Empty = provider default. */
   reasoningEffort: string;
+  /** How long a question or an approval waits before the turn gives up, in minutes. */
+  askTimeoutMinutes: number;
   /** Set once the first-start dialog has been answered or dismissed. */
   onboarded: boolean;
 }
@@ -95,6 +97,7 @@ const PERSISTED_KEYS: (keyof SettingsState)[] = [
   "browserControl",
   "keepInBackground",
   "reasoningEffort",
+  "askTimeoutMinutes",
   "onboarded",
 ];
 
@@ -124,6 +127,8 @@ const defaults: SettingsState = {
   browserControl: false,
   keepInBackground: true,
   reasoningEffort: "",
+  // Five minutes is a guess about somebody's attention; the field exists so it can be wrong.
+  askTimeoutMinutes: 5,
   onboarded: false,
 };
 

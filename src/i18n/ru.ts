@@ -593,6 +593,9 @@ export const ru: Messages = {
     addPlaceholder: "программа…",
     invalidCommand: "Только буквы, цифры, точка, подчёркивание, плюс и дефис.",
     removeCommand: "Удалить {command}",
+    askTimeout: "Время на ответ",
+    askTimeoutDesc: "Сколько вопрос или подтверждение ждёт ответа, прежде чем ход будет прерван.",
+    minutes: "минут",
   },
 
   workspacePicker: {

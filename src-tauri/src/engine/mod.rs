@@ -1061,6 +1061,7 @@ async fn ask_user(
     session_id: &str,
     args: &Value,
     seq: &mut u64,
+    wait: std::time::Duration,
 ) -> tools::ToolOutcome {
     let question = args
         .get("question")
@@ -1100,13 +1101,13 @@ async fn ask_user(
     });
     emit(app, event);
 
-    let outcome = match tokio::time::timeout(ASK_TIMEOUT, receiver).await {
+    let outcome = match tokio::time::timeout(wait, receiver).await {
         Ok(Ok(answer)) => tools::ToolOutcome::ok(answer),
         Ok(Err(_)) => tools::ToolOutcome::err("ask_user: the question was dropped"),
         Err(_) => tools::ToolOutcome::err(format!(
             "ask_user: no answer within {} minutes. The question has expired — ask again if the \
              answer is still needed.",
-            ASK_TIMEOUT.as_secs() / 60
+            (wait.as_secs() / 60).max(1)
         )),
     };
     // The sender must not outlive the wait. Leaving it in the map made a late answer look
@@ -1120,9 +1121,11 @@ async fn ask_user(
 
 /// Tools that need the user's explicit approval in "ask" mode. The sub-agent is a separate
 /// story: it cannot ask, so its own write/edit/bash calls stay denied unless full access is on.
-/// How long a question waits for an answer before the turn gives up. Long enough for someone
-/// who stepped away, short enough that a forgotten question does not hang the turn forever.
-const ASK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
+/// How long a question waits for an answer before the turn gives up. The value comes from the
+/// configuration (`askTimeoutSeconds`); this is only the floor for a nonsensical one.
+fn ask_timeout(config: &EngineConfig) -> std::time::Duration {
+    std::time::Duration::from_secs(config.ask_timeout_seconds.clamp(30, 3600))
+}
 
 fn requires_approval(name: &str) -> bool {
     matches!(name, "write" | "edit" | "bash")
@@ -1494,6 +1497,7 @@ async fn approve_tool(
     args: &Value,
     seq: &mut u64,
     offer_session: bool,
+    wait: std::time::Duration,
 ) -> bool {
     let action_id = format!("p{}", crate::db::unix_now());
     let (sender, receiver) = oneshot::channel::<String>();
@@ -1520,7 +1524,7 @@ async fn approve_tool(
     });
     emit(app, event);
 
-    let decision = match tokio::time::timeout(ASK_TIMEOUT, receiver).await {
+    let decision = match tokio::time::timeout(wait, receiver).await {
         Ok(Ok(answer)) => {
             if answer == "always" {
                 if let Some(db) = app.try_state::<Db>() {
@@ -1712,7 +1716,7 @@ async fn browser_click_tool(
             && !has_session_grant(app, session_id)
             && !has_tool_grant(app, "browser_click");
         if needs_question
-            && !approve_tool(app, session_id, "browser_click", args, seq, true).await
+            && !approve_tool(app, session_id, "browser_click", args, seq, true, ask_timeout(config)).await
         {
             return tools::ToolOutcome::err(
                 "permission denied by the user; do not retry this click without a new instruction",
@@ -2096,6 +2100,7 @@ mod tests {
             reasoning_effort: None,
             context_window: None,
             disabled_tools: Vec::new(),
+            ask_timeout_seconds: 300,
         })
     }
 
@@ -2286,6 +2291,33 @@ mod tests {
         // Only the spheres that exist get a header: no empty prose.
         let only_work = recall_block(&[row("work", "Nur Arbeit")]);
         assert!(!only_work.contains("in confidence"));
+    }
+
+    /// The wait for an answer is a setting, and a nonsensical value must not make a turn hang
+    /// for a day or expire before the question is even read.
+    #[test]
+    fn the_answer_wait_is_clamped() {
+        let with = |seconds: u64| EngineConfig {
+            api_key: String::new(),
+            base_url: "https://api.deepseek.com".to_string(),
+            model: "deepseek-flash".to_string(),
+            system_prompt: String::new(),
+            workspace: "/tmp".to_string(),
+            permission: "ask".to_string(),
+            command_policy: "all".to_string(),
+            allowed_commands: Vec::new(),
+            workspace_only: false,
+            browser_control: false,
+            max_turns: 1,
+            reasoning_effort: None,
+            context_window: None,
+            disabled_tools: Vec::new(),
+            ask_timeout_seconds: seconds,
+        };
+
+        assert_eq!(ask_timeout(&with(300)), std::time::Duration::from_secs(300));
+        assert_eq!(ask_timeout(&with(0)), std::time::Duration::from_secs(30), "floor");
+        assert_eq!(ask_timeout(&with(100_000)), std::time::Duration::from_secs(3600), "cap");
     }
 
     /// No default: storing a note without saying whose sphere it is has to fail, because that
@@ -2781,7 +2813,7 @@ async fn run_turn(
             } else if call.function.name == "choose_name" {
                 choose_name_tool(app, &arguments)
             } else if call.function.name == "ask_user" {
-                ask_user(app, session_id, &arguments, &mut seq).await
+                ask_user(app, session_id, &arguments, &mut seq, ask_timeout(config)).await
             } else if call.function.name == "task" {
                 task_tool_with_snapshots(
                     Some(app),
@@ -2812,7 +2844,7 @@ async fn run_turn(
                         && !has_session_grant(app, session_id)
                         && !has_tool_grant(app, "verify")
                     {
-                        approve_tool(app, session_id, "verify", &arguments, &mut seq, true).await
+                        approve_tool(app, session_id, "verify", &arguments, &mut seq, true, ask_timeout(config)).await
                     } else {
                         true
                     };
@@ -2950,6 +2982,7 @@ async fn run_turn(
                                     &arguments,
                                     &mut seq,
                                     true,
+                                    ask_timeout(config),
                                 )
                                 .await
                             {
@@ -3000,6 +3033,7 @@ async fn run_turn(
                         &arguments,
                         &mut seq,
                         true,
+                        ask_timeout(config),
                     )
                     .await
                 {
@@ -3024,6 +3058,7 @@ async fn run_turn(
                         &arguments,
                         &mut seq,
                         config.permission == "ask",
+                        ask_timeout(config),
                     )
                     .await
                     {

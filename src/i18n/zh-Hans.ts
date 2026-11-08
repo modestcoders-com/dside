@@ -592,6 +592,9 @@ export const zhHans: Messages = {
     addPlaceholder: "程序…",
     invalidCommand: "只允许字母、数字、点、下划线、加号和连字符。",
     removeCommand: "移除 {command}",
+    askTimeout: "回答时间",
+    askTimeoutDesc: "提问或授权在回合放弃之前等待回答的时长。",
+    minutes: "分钟",
   },
 
   workspacePicker: {

@@ -135,6 +135,26 @@ function resetCommands(): void {
         :description="t('sandbox.workspaceDesc')"
         @update:model-value="settings.workspaceOnly = $event"
       />
+
+      <!-- How long the companion waits for an answer. Five minutes is a guess about somebody's
+           attention; only the person knows whether they stepped away. -->
+      <div class="row">
+        <div class="text">
+          <div class="label">{{ t("sandbox.askTimeout") }}</div>
+          <div class="desc">{{ t("sandbox.askTimeoutDesc") }}</div>
+        </div>
+        <div class="timeout">
+          <input
+            v-model.number="settings.askTimeoutMinutes"
+            class="number"
+            type="number"
+            min="1"
+            max="60"
+            step="1"
+          />
+          <span class="unit">{{ t("sandbox.minutes") }}</span>
+        </div>
+      </div>
     </div>
 
     <p class="note">{{ t("sandbox.note") }}</p>
@@ -274,6 +294,59 @@ function resetCommands(): void {
 
 .commands .hint {
   margin-top: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.label {
+  color: var(--text-strong);
+  font-size: 13px;
+}
+
+.desc {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.timeout {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.number {
+  width: 70px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.number:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.unit {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .note {

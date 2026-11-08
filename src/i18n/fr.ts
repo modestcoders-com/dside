@@ -596,6 +596,9 @@ export const fr: Messages = {
     addPlaceholder: "programme…",
     invalidCommand: "Lettres, chiffres, point, tiret bas, plus et tiret uniquement.",
     removeCommand: "Retirer {command}",
+    askTimeout: "Temps de réponse",
+    askTimeoutDesc: "Combien de temps une question ou une approbation attend une réponse avant que le tour abandonne.",
+    minutes: "minutes",
   },
 
   workspacePicker: {
