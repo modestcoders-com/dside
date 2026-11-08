@@ -5102,3 +5102,31 @@ Datenverzeichnis unter `/tmp` gestartet, `.rpm` auf Inhalt geprüft (Binary, Des
 Icon-Größen), AppImage entsperrt und gestartet, Flatpak installiert → `flatpak info` **0.6.2**,
 Fenster aufgebaut. Die Flatpak lief auf dem gewohnten Datenverzeichnis, damit die gemeinsame
 Historie sichtbar bleibt.
+
+## 119. Der CI-Flatpak-Build scheiterte an `/app/lib64` (2026-11-08)
+
+Der erste Lauf des neuen `flatpak`-Jobs brach in `libayatana-indicator` ab: `libayatana-ido3-0.4`
+nicht gefunden, obwohl das Modul unmittelbar vorher gebaut wurde. Der Blick ins Log zeigt den
+Widerspruch: installiert nach **`/app/lib64`**, gesucht in `/app/lib`. Dasselbe Manifest baute auf
+dieser Maschine grün.
+
+**Ursache:** `GNUInstallDirs` im GNOME-50-SDK liefert `lib64`, weil `/usr/lib64` existiert und das
+Programm 64-bittig ist — im Sandkasten nachgemessen (`LIBDIR=lib64 SIZEOF=8 PREFIX=/app`). Der
+`flatpak-builder` aus Ubuntu 24.04 (1.4.4) gibt das unverändert weiter; der hier installierte
+(1.4.12) normalisiert auf `lib`. Deshalb fiel es lokal nie auf. Autotools (`libdbusmenu`) war
+nicht betroffen, weil `flatpak-builder` dort `--libdir=/app/lib` selbst setzt.
+
+**Änderung:** Die drei CMake-Module im vendored Manifest nennen `-DCMAKE_INSTALL_LIBDIR=lib`
+jetzt selbst. Damit hängt die Ablage nicht mehr von der `flatpak-builder`-Version ab. Das ist die
+einzige Abweichung vom `flathub/shared-modules`-Stand und steht so in `README.md` und im Manifest.
+
+Geprüft mit einem Testmanifest, das nur die Tray-Kette baut: alle Bibliotheken landen unter
+`/app/lib`, `libayatana-ido3-0.4` und `libayatana-indicator3` beide.
+
+### Der Windows-Job scheiterte an einem fremden Server
+`failed to bundle project: http status: 504` beim Herunterladen von NSIS 3.11 — ein Gateway-Fehler
+von GitHub, nicht Code. Der Lauf wird mit demselben Stand wiederholt.
+
+### Der Tag wandert
+Weil der erste Lauf auf dem alten Stand lief, wird `v0.6.2` auf beiden Remotes gelöscht und auf
+den korrigierten Commit gesetzt; ein Entwurf mit halben Assets bleibt nicht stehen.

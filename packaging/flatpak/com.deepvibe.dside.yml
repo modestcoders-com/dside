@@ -38,8 +38,9 @@ finish-args:
 modules:
   # The tray chain. The GNOME runtime has none of it, and without it the app cannot keep
   # running after the window closes — which is what reminders need. Vendored from
-  # flathub/shared-modules (MIT/LGPL, unmodified) so the build does not depend on a network
-  # checkout of somebody else's branch.
+  # flathub/shared-modules (MIT/LGPL) so the build does not depend on a network checkout of
+  # somebody else's branch; the CMake modules there name `/app/lib` explicitly, because the
+  # SDK would use `/app/lib64`, which the runtime does not search.
   - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
 
   # git is not in the GNOME runtime, and an IDE without its version control is half an IDE.

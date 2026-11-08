@@ -10,7 +10,7 @@ flatpak run com.deepvibe.dside
 
 | Module | Why |
 | --- | --- |
-| `shared-modules/libayatana-appindicator` | The GNOME runtime has no tray chain at all. Without it the app quits when the window closes, and reminders (which need a running process) never fire. Vendored unmodified from `flathub/shared-modules`. |
+| `shared-modules/libayatana-appindicator` | The GNOME runtime has no tray chain at all. Without it the app quits when the window closes, and reminders (which need a running process) never fire. Vendored from `flathub/shared-modules`, with one line added to each of its three CMake modules: `-DCMAKE_INSTALL_LIBDIR=lib`. The SDK's CMake defaults to `lib64`, which the runtime does not search, and `flatpak-builder` in Ubuntu does not correct it — the build then fails in `libayatana-indicator` or, worse, installs the tray library where it cannot be found. |
 | `git` (from source) | Not in the runtime. Built with `NO_RUST=1` — 2.47 clashes on an `unreachable` macro with the newer glibc, and 2.51+ wants cargo for `libgitcore`. |
 | `dside` | The release binary, desktop entry, AppStream metadata, icon. |
 
