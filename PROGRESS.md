@@ -5253,3 +5253,31 @@ Auslieferung, und sie trägt ihren Update-Zeiger jetzt selbst.
 **Geprüft:** `cargo test --lib` 94 / 14 ignoriert, i18n 521 Schlüssel, `check:private` sauber,
 `vue-tsc` grün. Der Workflow hat noch drei Jobs (`verify`, `build`, `attach`), `attach` hängt nur
 noch an `build` — mit `yaml` geparst, nicht geschätzt.
+
+### Der Windows-Job scheiterte an meinem Test
+Der erste Lauf des Tags war rot, aber nicht am Code: `a_removed_program_does_not_count_as_installed`
+prüfte mit `/bin/sh`, dass ein existierendes Programm erkannt wird. Auf Windows gibt es keinen
+`/bin/sh` — `panicked at src\lib.rs:1526: a shell exists somewhere`. Genau wofür `AGENTS.md` steht
+(„Windows-/macOS-spezifische Pfade werden nicht nur auf Linux geprüft"); ich hatte den Test auf
+dieser Maschine grün gesehen und daraus auf alle Plattformen geschlossen.
+
+Die Wache selbst war richtig — sie hatte auf dem Host schon einen toten Cursor-Eintrag aus der
+Liste geworfen. Nur ihr Beweis war falsch gewählt: jetzt `std::env::current_exe()`, das auf jeder
+Plattform existiert, und ein `#[cfg(unix)]`-Fall für den Pfad mit `/bin/sh`.
+
+Der Tag wanderte deshalb: Entwurf gelöscht, Tag auf beiden Remotes entfernt, neu gesetzt auf
+`2437828`, erneut gepusht. Das CI baute danach alle drei Plattformen.
+
+### Was am CI-Artefakt geprüft wurde
+Nicht nur lokal — das heruntergeladene Linux-Artefakt selbst: `.zsync` vorhanden (310 KB,
+`zsync: 0.6.2`), `.upd_info` mit dem Update-Zeiger, `Categories=Development;` in `.deb` **und**
+AppImage, `X-AppImage-Version=0.6.3`. Damit ist bewiesen, dass `LDAI_*` auch über `tauri-action`
+bei linuxdeploy ankommt und dass `zsync` auf `ubuntu-22.04` verfügbar ist.
+
+### Veröffentlicht
+`v0.6.3`, `latest`, 8 Assets: deb, rpm, AppImage, **AppImage.zsync**, linux-tar.gz, dmg (aarch64),
+`.exe` und das Windows-Zip. Am veröffentlichten Stand nachgeprüft: die `.zsync` lädt mit HTTP 200
+(310 238 bytes), ihr `URL`-Header zeigt auf das AppImage, und das AppImage selbst antwortet mit
+HTTP 200. Damit ist die Kette vollständig — Zeiger im Paket, Kontroll-Datei auf der Release-Seite,
+Ziel erreichbar. Ob Shelly daraus tatsächlich aktualisiert, zeigt erst der nächste Versionssprung;
+das bleibt die eine unbelegte Behauptung dieser Runde.
