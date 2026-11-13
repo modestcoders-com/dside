@@ -78,13 +78,14 @@ jobs:
           workspaces: src-tauri
 
       # Tauri v2 needs WebKitGTK 4.1 and libsoup3; the default runner does not have them.
+      # `zsync` brings `zsyncmake`, which writes the update control file further down.
       - name: Linux build dependencies
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev libsoup-3.0-dev libgtk-3-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf
+            libayatana-appindicator3-dev librsvg2-dev patchelf zsync
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -93,6 +94,17 @@ jobs:
       - name: Version from the tag
         if: github.ref_type == 'tag'
         run: node scripts/set-version.mjs "${{ github.ref_name }}"
+
+      # What makes an installed AppImage able to update itself: a version to compare, and a
+      # pointer to the `.zsync` control file next to the release asset. Tauri reads both from the
+      # environment while it drives linuxdeploy; it writes no control file, that step follows the
+      # build. Both values come from package.json, so a manual run says the same as a tag.
+      - name: AppImage identity
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          echo "LDAI_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "LDAI_UPDATE_INFORMATION=gh-releases-zsync|modestcoders-com|dside|latest|DS.IDE_*_amd64.AppImage.zsync" >> "$GITHUB_ENV"
 
       # Linux uses Secret Service; the native keyring bug lived on Windows/macOS. Run the
       # library tests where those stores actually are, so the two-entry test has teeth.
@@ -135,6 +147,10 @@ jobs:
       # No zip step for macOS on purpose: Tauri deletes the .app after building the dmg and
       # leaves a DS.IDE.app.tar.gz behind, which is exactly the archive we want.
 
+      - name: AppImage update control file (Linux)
+        if: matrix.os == 'ubuntu-22.04'
+        run: bash scripts/appimage-zsync.sh
+
       - name: Zip the app (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
@@ -149,6 +165,7 @@ jobs:
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.rpm
             src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.AppImage.zsync
             src-tauri/target/release/bundle/**/*.dmg
             src-tauri/target/release/bundle/**/*.exe
             src-tauri/target/release/*.tar.gz
@@ -156,53 +173,13 @@ jobs:
             *.zip
           if-no-files-found: warn
 
-  # The Flatpak. Distributions ship it through their store, and it is the only channel whose
-  # updates work: a Tauri AppImage carries no update metadata, so no store can replace it.
-  #
-  # Runner and pnpm are deliberate: `ubuntu-22.04` ships a flatpak-builder that calls
-  # `appstream-compose`, which the GNOME 50 SDK no longer has (it is `appstreamcli` there), and
-  # pnpm 12 ignores `pnpm.overrides` in package.json, so `--frozen-lockfile` fails.
-  flatpak:
-    needs: verify
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-      - name: Build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev libsoup-3.0-dev libgtk-3-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf \
-            flatpak flatpak-builder
-      - run: pnpm install --frozen-lockfile
-      - name: Version from the tag
-        if: github.ref_type == 'tag'
-        run: node scripts/set-version.mjs "${{ github.ref_name }}"
-      - run: ./packaging/flatpak/build.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dside-flatpak
-          path: target/flatpak/*.flatpak
-          if-no-files-found: error
-
   # The installers go to the release through tauri-action; the plain archives only exist as
   # workflow artifacts so far. This puts them on the release page as well — the no-installer
   # download for people who prefer it.
   attach:
-    # The Flatpak artifact has to exist before the release page is written, and a failed
-    # package should block a release rather than ship without it.
-    needs: [build, flatpak]
+    # Every platform has to have produced its bundles before the release page is written: a
+    # failed build should block a release rather than ship without it.
+    needs: [build]
     if: github.ref_type == 'tag' && !cancelled()
     runs-on: ubuntu-latest
     steps:
@@ -217,4 +194,4 @@ jobs:
           files: |
             assets/**/*.tar.gz
             assets/**/*.zip
-            assets/**/*.flatpak
+            assets/**/*.AppImage.zsync

@@ -1062,7 +1062,7 @@ async fn ask_user(
     args: &Value,
     seq: &mut u64,
     wait: std::time::Duration,
-) -> tools::ToolOutcome {
+) -> (tools::ToolOutcome, bool) {
     let question = args
         .get("question")
         .and_then(Value::as_str)
@@ -1070,7 +1070,10 @@ async fn ask_user(
         .trim()
         .to_string();
     if question.is_empty() {
-        return tools::ToolOutcome::err("ask_user: 'question' is required");
+        return (
+            tools::ToolOutcome::err("ask_user: 'question' is required"),
+            false,
+        );
     }
     let options: Vec<String> = args
         .get("options")
@@ -1101,14 +1104,23 @@ async fn ask_user(
     });
     emit(app, event);
 
-    let outcome = match tokio::time::timeout(wait, receiver).await {
-        Ok(Ok(answer)) => tools::ToolOutcome::ok(answer),
-        Ok(Err(_)) => tools::ToolOutcome::err("ask_user: the question was dropped"),
-        Err(_) => tools::ToolOutcome::err(format!(
-            "ask_user: no answer within {} minutes. The question has expired — ask again if the \
-             answer is still needed.",
-            (wait.as_secs() / 60).max(1)
-        )),
+    // The flag is the second half of the answer, and the important one: an expired question
+    // used to come back to the model as an ordinary tool error, and the turn continued —
+    // deciding without the person it had just asked. `expired = true` ends the turn instead.
+    let (outcome, expired) = match tokio::time::timeout(wait, receiver).await {
+        Ok(Ok(answer)) => (tools::ToolOutcome::ok(answer), false),
+        Ok(Err(_)) => (
+            tools::ToolOutcome::err("ask_user: the question was dropped"),
+            false,
+        ),
+        Err(_) => (
+            tools::ToolOutcome::err(format!(
+                "ask_user: no answer within {} minutes. The question has expired — ask again if \
+                 the answer is still needed.",
+                (wait.as_secs() / 60).max(1)
+            )),
+            true,
+        ),
     };
     // The sender must not outlive the wait. Leaving it in the map made a late answer look
     // accepted: `engine_answer` found an entry, reported success, and the text went into a
@@ -1116,7 +1128,7 @@ async fn ask_user(
     if let Ok(mut pending) = app.state::<EngineState>().pending.lock() {
         pending.remove(&action_id);
     }
-    outcome
+    (outcome, expired)
 }
 
 /// Tools that need the user's explicit approval in "ask" mode. The sub-agent is a separate
@@ -2629,6 +2641,9 @@ async fn run_turn(
     // ("tool must be a response to a preceding tool_calls"), which broke the conversation
     // permanently after the first multi-round turn.
     let mut all_tool_calls: Vec<Value> = Vec::new();
+    // Set when a question's deadline passed. The turn then ends instead of continuing to a
+    // decision the user cannot influence any more — the question is gone from the screen.
+    let mut question_expired = false;
 
     for _turn in 0..max_turns {
         if cancel.load(Ordering::SeqCst) {
@@ -2813,7 +2828,12 @@ async fn run_turn(
             } else if call.function.name == "choose_name" {
                 choose_name_tool(app, &arguments)
             } else if call.function.name == "ask_user" {
-                ask_user(app, session_id, &arguments, &mut seq, ask_timeout(config)).await
+                let (outcome, expired) =
+                    ask_user(app, session_id, &arguments, &mut seq, ask_timeout(config)).await;
+                if expired {
+                    question_expired = true;
+                }
+                outcome
             } else if call.function.name == "task" {
                 task_tool_with_snapshots(
                     Some(app),
@@ -3160,6 +3180,32 @@ async fn run_turn(
                 screenshot.image = Some(vec![image]);
                 messages.push(screenshot);
             }
+            if question_expired {
+                // Remaining calls in this round are not run: the turn is over.
+                break;
+            }
+        }
+
+        // The question rang out. Say it plainly and stop — the conversation must not go on as
+        // if a decision had been taken. Nothing before the question is lost.
+        if question_expired {
+            seq += 1;
+            let mut notice = EngineEvent::new(session_id, seq, "error");
+            notice.error = Some(format!(
+                "Stopped: the question was not answered within {} minutes, so the turn ended \
+                 instead of going on without you. Nothing after the question was decided. Ask \
+                 again, or raise the answer time in Settings → Policies.",
+                (ask_timeout(config).as_secs() / 60).max(1)
+            ));
+            emit(app, notice);
+            seq += 1;
+            let mut event = EngineEvent::new(session_id, seq, "turn_end");
+            event.stop_reason = Some("no_answer".to_string());
+            emit(app, event);
+            if let Some(db) = app.try_state::<Db>() {
+                let _ = db.touch_session(session_id);
+            }
+            return (seq, Ok(()));
         }
     }
 

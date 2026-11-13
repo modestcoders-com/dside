@@ -271,6 +271,14 @@ fn detect_editors_impl() -> Vec<EditorCandidate> {
             if first.ends_with(".desktop") {
                 continue;
             }
+            // A `.desktop` file can outlive its program: a package removed without cleaning up,
+            // or an AppImage moved to another folder. The listing used to trust the entry, so a
+            // dead launcher appeared as an installed editor and every click on it failed with
+            // "No such file or directory". The PATH branch has always checked; this one now
+            // does too. `flatpak` and `snap` are launchers, so they are checked by name.
+            if resolve_program(first).is_none() {
+                continue;
+            }
             let Some(known) = match_known(&stem, first) else {
                 continue;
             };
@@ -455,7 +463,13 @@ fn open_workspace_in_editor(editor_id: String, workspace: String) -> Result<(), 
     command
         .args(args)
         .spawn()
-        .map_err(|error| format!("{program}: {error}"))?;
+        .map_err(|error| {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                format!("{program} is not there any more — the editor was removed or moved. Choose another one.")
+            } else {
+                format!("{program}: {error}")
+            }
+        })?;
     Ok(())
 }
 
@@ -1503,6 +1517,24 @@ mod tests {
 
         assert!(search_names(Some("zzzz"), None, 10).is_empty());
         assert_eq!(search_names(None, None, 3).len(), 3, "limit is respected");
+    }
+
+    /// The guard that keeps a dead launcher out of the editor list. `resolve_program` is the
+    /// one thing it trusts: a name on PATH or a path that really exists.
+    #[test]
+    fn a_removed_program_does_not_count_as_installed() {
+        assert!(
+            resolve_program("/bin/sh").is_some() || resolve_program("/usr/bin/sh").is_some(),
+            "a shell exists somewhere"
+        );
+        assert!(
+            resolve_program("/nonexistent/editor-that-was-removed").is_none(),
+            "a path that is not there must not pass"
+        );
+        assert!(
+            resolve_program("definitely-not-an-editor-binary-xyz").is_none(),
+            "a name outside PATH must not pass"
+        );
     }
 
     #[test]

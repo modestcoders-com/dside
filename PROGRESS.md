@@ -5141,3 +5141,115 @@ Abklingen der Störung lief derselbe Job ohne Änderung durch.
 `attach` hat währenddessen einen Entwurf mit sechs von acht Dateien geschrieben. Der wurde erst
 veröffentlicht, als alle acht da waren: deb, rpm, AppImage, linux-tar.gz, dmg, `.exe` und Flatpak.
 Version `v0.6.2`, `latest`, 8 Assets.
+
+## 120. Vier Funde aus dem Alltag — Menü, Geistereditor, Pfadmeldung, abgelaufene Frage (2026-11-12)
+
+Rückmeldung aus DS.IDE, plus die eigene Frage, warum ein frisch installiertes AppImage nicht im
+Menü steht. Vier Ursachen, drei davon im eigenen Code.
+
+### Das Menü kannte die App nicht
+`Categories=` war leer — in der AppImage **und** in der `.deb`, denn beide entstehen aus
+derselben Vorlage des Bundlers. KDE legt einen Eintrag ohne Kategorie in keinen Zweig; der
+Menüzweig „Verloren & Gefunden" greift bei Plasma nicht. Nachgewiesen mit
+`kbuildsycoca6 --menutest`: `DeepVibe` steht unter *Entwicklung/IDEs*, `ds.ide` nirgends.
+
+Ursache: `bundle.category` fehlte in `tauri.conf.json`. Tauri schreibt dann ein leeres Feld.
+Jetzt `DeveloperTool` — der Bundler bildet das auf `Development;` ab. Die Flatpak war die
+einzige Auslieferung mit Kategorie, weil ihr `.desktop` von Hand geschrieben ist.
+
+Dasselbe Muster traf fremde Einträge auf derselben Maschine (Antigravity, Cursor, Frame) —
+dort ist es nicht unser Fehler, zeigt aber, wie still der Fehler ist.
+
+### Shelly liest die AppImage, nicht die Release-Seite
+Die Update-Prüfung kommt aus dem eingebetteten Material: `X-AppImage-Version` für die Version,
+`gh-releases-zsync` für die Update-Quelle, dazu das eingebettete `.desktop` für Name, Icon und
+Kategorie. Unsere AppImage hat **keine** `.upd_info` (1024 Nullbytes) und kein
+`X-AppImage-Version`; Shelly trägt deshalb `version = Unknown` ein und findet keine Updates,
+obwohl Repo und Tag richtig erkannt wurden. Tauri erzeugt keine zsync-Daten. Das bleibt offen —
+es ist keine Kleinigkeit, sondern die Wahl eines Update-Kanals.
+
+### Ein toter Starter galt als installierter Editor
+Die Editor-Liste prüfte den PATH-Zweig auf Ausführbarkeit, den `.desktop`-Zweig nicht. Eine
+liegen gebliebene Verknüpfung (`Exec=` auf eine entfernte Datei) erschien deshalb als Editor,
+und jeder Klick scheiterte mit „No such file or directory". Jetzt gilt für beide Wege dieselbe
+Prüfung (`resolve_program`), und der Fehlschlag beim Start sagt in einem Satz, dass der Editor
+weg ist. Live geprüft: der tote Eintrag verschwindet aus der Liste, drei echte bleiben.
+
+### `cargo` erlaubt, nicht auffindbar, Ausweg gesperrt
+Der Bericht war präzise: in der Flatpak ist `/usr/bin` die GNOME-Runtime, dort gibt es kein
+Rust; `cargo` liegt in `~/.rustup/toolchains/*/bin` und nicht im PATH; der absolute Pfad wird
+abgelehnt. Die Ablehnung ist richtig — ein Pfad kann auf jede Datei zeigen —, die Meldung war
+falsch: sie sprach von einer Regel, die nicht das Problem war. Sie nennt jetzt den Programmnamen,
+ob er erlaubt ist und ob die Datei überhaupt existiert. Kein Verhalten geändert, nur die
+Auskunft.
+
+### Eine abgelaufene Frage beendet jetzt den Turn
+`ask_user` gab bei Zeitablauf einen Werkzeugfehler zurück, und das Modell entschied weiter — mit
+einer Frage, die auf dem Bildschirm nicht mehr existierte. Jetzt endet der Turn: eine Meldung
+sagt, dass innerhalb der Frist keine Antwort kam und nichts danach entschieden wurde, und
+`stop_reason` ist `no_answer`. Die Frist selbst bleibt eine Einstellung (Richtlinien →
+Antwortzeit); nachgezogen ist die Oberfläche, die den Marker nicht als Text in die Blase schreibt.
+
+### Geprüft
+`cargo test --lib` **94** / 14 ignoriert (drei neu: Pfadmeldung zweimal, toter Editor),
+`vue-tsc --noEmit` grün, i18n 521 Schlüssel. Kein Paket gebaut — die Runde sammelt noch.
+**Nicht geprüft:** ob `category` wirklich in AppImage und `.deb` ankommt; das zeigt erst der
+nächste Build am Paket.
+
+## 121. Die AppImage kann sich jetzt selbst aktualisieren (2026-11-12)
+
+Entschieden nach der Rückfrage, was „AppImage als Hauptkanal" heißen soll: bei ihm gibt es keinen
+zweiten Kanal. AUR nimmt keine Neuanmeldungen, Debian und Ubuntu sind zu streng, Flathub hat
+abgelehnt — GitHub und die eigene Seite bleiben. Die Frage war also nicht *welcher* Kanal, sondern
+ob die AppImage ihren Stand selbst prüfen kann.
+
+### Was fehlte, gemessen
+Shelly liest aus der Datei: `X-AppImage-Version` (Version) und einen Zeiger auf eine
+`.zsync`-Kontroll-Datei (`gh-releases-zsync|…`). Unsere 0.6.2-AppImage hatte an beiden Stellen
+nichts — `.upd_info` war 1024 Nullbytes. **Tauri kann das auch nicht:** im Bundler-Binary kommt
+`zsync` kein einziges Mal vor. Es war also kein vergessener Schalter, sondern ein fehlender Schritt.
+`createUpdaterArtifacts` hilft nicht — das ist Tauris eigener Updater mit Signaturschlüssel.
+
+### Die Lösung, ohne Umverpacken
+`tauri-action` reicht `LDAI_VERSION` und `LDAI_UPDATE_INFORMATION` an linuxdeploy durch (im
+Plugin nachgesehen: es liest beide). Also zwei Zeilen im CI statt eines zweiten Verpackungslaufs,
+der das Artefakt neu schreibt. Die `.zsync` selbst schreibt `scripts/appimage-zsync.sh` mit
+`zsyncmake`; der CI lädt sie mit dem Release hoch, und `attach` reicht sie an die Release-Seite.
+
+Der Dateiname im Zeiger ist ein Muster (`DS.IDE_*_amd64.AppImage.zsync`), weil unser Artefakt
+Unterstriche und `amd64` trägt, nicht die übliche Form.
+
+### Geprüft, und wo die Prüfung endet
+Lokaler Build mit den beiden Variablen (exit 0):
+- `.upd_info` = `gh-releases-zsync|modestcoders-com|dside|latest|DS.IDE_*_amd64.AppImage.zsync`
+- eingebettetes `.desktop`: `X-AppImage-Version=0.6.2` **und** `Categories=Development;` — damit ist
+  auch der Menü-Fix aus §120 im Paket bestätigt, nicht nur im Code
+- `.zsync` (356 KB) mit `Filename`, `MTime`, `URL`, `SHA-1`, `Length`, `Blocksize`
+
+**Nicht geprüft:** dass Shelly die Aktualisierung wirklich durchführt. Dafür müsste ein Release die
+`.zsync` ausliefern; das geht erst mit 0.6.3. Bis dahin ist „Shelly aktualisiert" eine begründete
+Erwartung, keine Messung — steht so in `TODO.md`.
+
+## 122. Die Flatpak ist wieder weg (2026-11-13)
+
+Nachgefragt, zu Recht: „Mir war so als hätte ich gestern gesagt 'Das war das Aus für flatpak.' —
+wir bekommen es mit flatpak nicht sauber zum Laufen, was will ich dann damit?" Er hatte es gesagt.
+Ich hatte es danach trotzdem weitergebaut, weil es technisch funktionierte, und beim Versionssprung
+sogar noch eine Release-Zeile in die Metainfo eingetragen. Technisch richtig, am Bedarf vorbei.
+
+**Entfernt:** `packaging/flatpak/` (Manifest, Build-Skript, Desktop-Datei, Metainfo, Icon, die
+mitgelieferte Tray-Kette, 12 Dateien), der `flatpak`-Job im Release-Workflow, die `.flatpak` aus
+dem `attach`-Schritt, die Bauanleitung in `packaging/README.md`, die Einträge in `TODO.md` und das
+lokale `target/flatpak`. Installiert war keine mehr.
+
+**Geblieben ist der Code, der eine Sandbox erkennt** — `FLATPAK_ID` in `lib.rs`, `portal.rs` und
+`in_sandbox` in `capture.rs`. Er ist klein, tut nichts und hat jetzt keinen Aufrufer mehr aus einem
+Paket heraus; ein Umbau in derselben Nacht wie ein Release wäre Risiko ohne Nutzen. Steht als
+Aufräumpunkt in `TODO.md`, nicht als offener Fehler.
+
+**Was damit auch entfällt:** die Annahme, es gäbe einen zweiten Update-Kanal. Die AppImage ist die
+Auslieferung, und sie trägt ihren Update-Zeiger jetzt selbst.
+
+**Geprüft:** `cargo test --lib` 94 / 14 ignoriert, i18n 521 Schlüssel, `check:private` sauber,
+`vue-tsc` grün. Der Workflow hat noch drei Jobs (`verify`, `build`, `attach`), `attach` hängt nur
+noch an `build` — mit `yaml` geparst, nicht geschätzt.

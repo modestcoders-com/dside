@@ -9,48 +9,39 @@ is checked first.
 ```sh
 pnpm build                                   # frontend
 cd src-tauri && cargo build --release --features tauri/custom-protocol   # the binary
-pnpm tauri build --bundles deb,rpm,appimage  # the usual bundles
-./packaging/flatpak/build.sh                 # Flatpak (see below)
+pnpm tauri build --bundles deb,rpm,appimage  # the bundles
+bash scripts/appimage-zsync.sh               # the update control file for the AppImage
 ```
 
-## Flatpak
+## The AppImage is the one that matters
 
-```sh
-flatpak install --user -y target/flatpak/DS-IDE-<version>-x86_64.flatpak
-flatpak run com.deepvibe.dside
-```
+It is the only format that can be installed without a package manager, and on this machine no
+distribution repository is open to the project. So it carries its own update path:
 
-`build.sh` compiles the program first and packages it second: the sandbox only copies the release
-binary, `.desktop`, AppStream metadata and icon into place. What is packaged is what was run.
+- `LDAI_VERSION` and `LDAI_UPDATE_INFORMATION` at build time give it a version to compare and a
+  pointer to its `.zsync` control file (both end up in the ELF section `.upd_info` and in the
+  embedded `.desktop`). The release workflow passes them.
+- `scripts/appimage-zsync.sh` writes that control file next to the package, and CI uploads it with
+  the release.
 
-## What the sandbox changes — and what it does not
+Without both halves an installed copy cannot tell whether it is current. Tauri has no step of its
+own for this; `createUpdaterArtifacts` is a different mechanism (its own updater, needs a signing
+key) and does not help.
 
-Flatpak *is* a sandbox; there is no version without one. The question is not "why a sandbox" but
-which permissions the app needs, and which of its features can still work inside.
+## What is checked before a tag
 
-**It sees the same data as every other installation.** A sandboxed app normally gets its own
-directory (`~/.var/app/<id>/data`), which means a second installation opens with an empty
-conversation while the first one still has the history. The manifest mounts the usual data
-directory (`--filesystem=xdg-data/com.deepvibe.ds-ide`) and the program uses it when it runs under
-Flatpak (`data_dir` in `lib.rs`). One history, one set of memories, one settings record.
-Only one of them should run at a time — both write the same SQLite file.
+- The `.desktop` inside the AppImage carries `Categories=Development;` — with an empty field, KDE
+  puts the entry in no menu branch at all, so the app installs and appears nowhere.
+- `.upd_info` is not empty, and the `.zsync` exists beside the package.
+- `.deb` and `.rpm` are inspected (`dpkg-deb -c`, `rpm -qlp`) and the AppImage is started once.
 
-**Screenshots keep working, through the desktop portal.** The capture tools the AppImage calls
-(`grim`, `spectacle`, `scrot`) are not in the runtime, so inside the sandbox the app asks the
-desktop instead (`portal.rs`): the compositor takes the picture, the desktop decides, and the app
-receives a file. The desktop may ask the user once for permission — that is its decision, not the
-app's. Without this the companion would be blind in the packaged build, which would make the
-Flatpak a version with half the senses.
+## Flatpak — removed 2026-11-13
 
-Three things are decided by the manifest and are easy to get wrong later:
+There was one, built and working: shared data directory, screenshots through the desktop portal,
+the tray chain vendored into the bundle, a CI job. It was removed because it did not earn its
+place — the maintainer does not use it, no one else does, and the channels that would have made it
+worthwhile (Flathub) declined the project. Packaging that nobody runs is a claim, not a feature.
 
-- **`libayatana-appindicator` is not in the GNOME runtime.** The tray crate *panics* (not returns)
-  when the library is missing, and the release profile uses `panic = "abort"`, so the app checks
-  for the library before it builds an icon (`tray_supported`). In the Flatpak there is no tray;
-  closing the window quits, which is the honest behaviour without an icon.
-- **`git` is not in the runtime either.** It is built into the app from source (`NO_RUST=1`;
-  git ≥ 2.51 needs cargo for `libgitcore`), so the git panel, the terminal and the companion's
-  shell all find it. Checked: `git ls-remote https://…` works inside the sandbox.
-- **No tray icon.** With the icon absent, closing the window ends the app; reminders therefore
-  only fire while a window is open. A tray in the sandbox would need the appindicator library
-  inside the runtime, which GNOME's does not carry.
+The sandbox-specific code paths are still in the program (`FLATPAK_ID` in `lib.rs`, `portal.rs`,
+`in_sandbox` in `capture.rs`) because they are small and harmless. They no longer have a package
+that reaches them; see `TODO.md`.

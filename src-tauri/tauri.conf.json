@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DS.IDE",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "identifier": "com.deepvibe.ds-ide",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -53,6 +53,9 @@
       "icons/icon.ico"
     ],
     "license": "MIT",
-    "licenseFile": "../LICENSE"
+    "licenseFile": "../LICENSE",
+    "category": "DeveloperTool",
+    "shortDescription": "An agentic IDE for DeepSeek",
+    "longDescription": "A local-first agentic IDE on Tauri: a chat partner that runs tools on your own machine next to a work area with a file tree, diffs, a terminal and a preview."
   }
 }

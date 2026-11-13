@@ -125,7 +125,12 @@ export function endAssistantMessage(stopReason?: string): void {
     // "error" is the *terminal marker* of a failed turn, not an error message: the error
     // itself arrives as its own event and is already on the bubble. Letting the marker win
     // replaced a real message ("LLM HTTP 400: …") with the word "error".
-    if (stopReason && !["end_turn", "abort", "error"].includes(stopReason)) {
+    // "no_answer" is terminal too: the engine has already explained in its own notice why the
+    // turn stopped, and the marker must not replace that sentence with a token.
+    if (
+      stopReason &&
+      !["end_turn", "abort", "error", "no_answer"].includes(stopReason)
+    ) {
       message.error = stopReason;
     }
   }

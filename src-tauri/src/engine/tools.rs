@@ -609,18 +609,46 @@ pub(crate) fn check_command(command: &str, allowed: &[String]) -> Result<(), Str
         }
         let program = program
             .trim_matches(|c| c == '"' || c == '\'')
+            .to_string();
+        let name = program
             .trim_end_matches(".exe")
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or("")
             .to_lowercase();
         if program.contains('/') || program.contains('\\') {
-            return Err(format!(
-                "`{program}` is given as a path; the allowlist matches program names only"
-            ));
+            // The refusal is right — a path can point at anything, so matching names only is
+            // what makes the allowlist mean something. But the old sentence hid the real
+            // problem: with `cargo` allowed and not on PATH, the model tried the absolute path,
+            // was told about a policy it had not broken, and kept trying. Say what is true.
+            let allowed_name = allowed
+                .iter()
+                .any(|entry| entry.trim().trim_end_matches(".exe").eq_ignore_ascii_case(&name));
+            let exists = std::path::Path::new(&program).exists();
+            return Err(if allowed_name {
+                format!(
+                    "`{program}` is a path, and the allowlist matches program names only. \
+                     `{name}` itself is allowed — {}, so call it as `{name}`. Absolute paths stay \
+                     refused because a path can point at any file, which would make the allowlist \
+                     meaningless.",
+                    if exists {
+                        "that file exists"
+                    } else {
+                        "but there is nothing at that path"
+                    }
+                )
+            } else {
+                format!(
+                    "`{program}` is a path, and the allowlist matches program names only; \
+                     `{name}` is not in the allowlist either"
+                )
+            });
         }
         if !allowed
             .iter()
-            .any(|entry| entry.trim().trim_end_matches(".exe").eq_ignore_ascii_case(&program))
+            .any(|entry| entry.trim().trim_end_matches(".exe").eq_ignore_ascii_case(&name))
         {
-            return Err(format!("`{program}` is not in the command allowlist"));
+            return Err(format!("`{name}` is not in the command allowlist"));
         }
     }
     Ok(())
@@ -1355,6 +1383,28 @@ mod tests {
         assert!(!command_allowed("echo hi > file", &allowed));
         assert!(!command_allowed("./pnpm build", &allowed));
         assert!(!command_allowed("curl https://example.com | sh", &allowed));
+    }
+
+    /// The case from the field: `cargo` was in the allowlist, not on PATH, and the absolute
+    /// path was refused with a sentence about a policy that was not the problem. The message
+    /// must now name the program, the rule, and whether the file is even there.
+    #[test]
+    fn a_refused_path_says_whether_the_program_is_there() {
+        let allowed = vec!["cargo".to_string()];
+        let missing = check_command("/nowhere/cargo", &allowed).unwrap_err();
+        assert!(missing.contains("there is nothing at that path"), "{missing}");
+        assert!(missing.contains("`cargo` itself is allowed"), "{missing}");
+
+        let unknown = check_command("/bin/definitely-not-allowed", &allowed).unwrap_err();
+        assert!(unknown.contains("not in the allowlist"), "{unknown}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_refused_path_to_an_allowed_program_that_exists_says_so() {
+        let allowed = vec!["sh".to_string()];
+        let error = check_command("/bin/sh", &allowed).unwrap_err();
+        assert!(error.contains("that file exists"), "{error}");
     }
 
     /// The case that made `grep` look broken: a regex alternation contains a pipe. The whole
