@@ -1523,9 +1523,14 @@ mod tests {
     /// one thing it trusts: a name on PATH or a path that really exists.
     #[test]
     fn a_removed_program_does_not_count_as_installed() {
+        // The program that is running right now: a path that exists on every platform. An
+        // earlier version of this test used `/bin/sh`, which does not exist on Windows — the
+        // only place the difference shows, and exactly what AGENTS.md warns about.
+        let running = std::env::current_exe().expect("the test binary has a path");
         assert!(
-            resolve_program("/bin/sh").is_some() || resolve_program("/usr/bin/sh").is_some(),
-            "a shell exists somewhere"
+            resolve_program(&running.to_string_lossy()).is_some(),
+            "a path that exists must pass: {}",
+            running.display()
         );
         assert!(
             resolve_program("/nonexistent/editor-that-was-removed").is_none(),
