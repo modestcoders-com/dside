@@ -13,8 +13,12 @@ pub struct SkillSummary {
 }
 
 pub fn skills_root() -> PathBuf {
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".ds-ide").join("skills")
+    // `HOME` is not set on Windows; the old fallback was `"."`, which put skills into whatever
+    // directory the app happened to be started from.
+    crate::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".ds-ide")
+        .join("skills")
 }
 
 pub fn ensure_root() -> PathBuf {

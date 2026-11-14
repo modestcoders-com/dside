@@ -1,15 +1,40 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { t } from "../../i18n";
 import { modelChoices } from "../../stores/models";
 import { settings } from "../../stores/settings";
 import { invoke } from "@tauri-apps/api/core";
-import { lastUsage } from "../../composables/useEngine";
+import { clearLastUsage, lastUsage } from "../../composables/useEngine";
 import { activeSessionId } from "../../stores/sessions";
 
-const emit = defineEmits<{ compacted: [folded: number | null] }>();
+const emit = defineEmits<{ compacted: [folded: number | null, error: string | null] }>();
 
 const working = ref(false);
+
+/**
+ * What the next request would carry, asked from the engine — the same figure the automatic
+ * compression uses. It prefers the provider's own report while that report still describes
+ * this history, and falls back to an estimate after a compression, when it no longer does.
+ *
+ * There used to be a second source here: the raw `promptTokens` of the last request. It is
+ * exact, but it survives restarts and it describes a history that compression replaces — so
+ * the ring kept showing the old size and a successful compression looked like a no-op.
+ */
+const status = ref<{ used: number; basis: string } | null>(null);
+
+async function refresh(): Promise<void> {
+  try {
+    status.value = await invoke<{ used: number; basis: string }>("context_status", {
+      sessionId: activeSessionId.value,
+    });
+  } catch {
+    // The ring keeps whatever it had; a missing number is better than a wrong one.
+  }
+}
+
+onMounted(() => void refresh());
+// Every turn ends with a usage report — that is the moment the measurement moved on.
+watch(lastUsage, () => void refresh());
 
 /**
  * Compressing is an explicit act: it costs a model call, it changes what the model sees, and
@@ -23,9 +48,15 @@ async function compact(): Promise<void> {
     const report = await invoke<{ folded: number } | null>("session_compact", {
       sessionId: activeSessionId.value,
     });
-    emit("compacted", report?.folded ?? null);
-  } catch {
-    emit("compacted", null);
+    // The stored measurement now describes a history that is gone; drop it before asking for
+    // the new size, or a later start would restore the old number again.
+    clearLastUsage();
+    await refresh();
+    emit("compacted", report?.folded ?? null, null);
+  } catch (error) {
+    // A failure is not "nothing to compress": saying so would hide an error behind a phrase
+    // that sounds like an answer.
+    emit("compacted", null, String(error));
   } finally {
     working.value = false;
   }
@@ -34,7 +65,7 @@ async function compact(): Promise<void> {
 /**
  * How much of the model's context is used, as a ring. The number comes from the provider's
  * own usage report for the last request, the limit from the model list — nothing here is
- * estimated. Clicking it compresses the older part of the conversation now; the ring itself
+ * invented. Clicking it compresses the older part of the conversation now; the ring itself
  * only displays.
  */
 const RADIUS = 7;
@@ -44,18 +75,30 @@ const limit = computed(
   () => modelChoices().find((entry) => entry.id === settings.model)?.contextWindow ?? 0,
 );
 
+/** The figure the engine gave, and whether it is a measurement or an estimate of what is left. */
+const used = computed<number | null>(() => status.value?.used ?? null);
+
+const isEstimated = computed(() => status.value !== null && status.value.basis !== "measured");
+
 const share = computed(() => {
-  if (!limit.value || !lastUsage.value) return 0;
-  return Math.min(1, lastUsage.value.promptTokens / limit.value);
+  if (!limit.value || used.value === null) return 0;
+  return Math.min(1, used.value / limit.value);
 });
 
 const percent = computed(() => Math.round(share.value * 100));
 
 const hint = computed(() => {
-  if (!lastUsage.value) return t("composer.contextUnknown");
-  if (!limit.value) return t("composer.tokens", { used: lastUsage.value.promptTokens });
+  if (used.value === null) return t("composer.contextUnknown");
+  if (!limit.value) return t("composer.tokens", { used: used.value });
+  if (isEstimated.value) {
+    return t("composer.contextHintEstimated", {
+      used: used.value,
+      total: limit.value,
+      percent: percent.value,
+    });
+  }
   return t("composer.contextHint", {
-    used: lastUsage.value.promptTokens,
+    used: used.value,
     total: limit.value,
     percent: percent.value,
   });

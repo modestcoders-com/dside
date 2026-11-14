@@ -145,6 +145,34 @@ pub async fn session_compact(
     compact_session(&app, &session_id, keep_recent.unwrap_or(KEEP_RECENT)).await
 }
 
+/// How large the next request would be, in the same way the automatic compression decides.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextStatus {
+    pub used: i64,
+    /// `measured` when the provider's last report still describes this history, `estimated`
+    /// otherwise — after a compression the measured number belongs to a history that is gone.
+    pub basis: String,
+}
+
+/// The context ring needs a number that survives a compression. The provider's usage report
+/// cannot give it: it describes one request, and compressing the history does not make a new
+/// request for the shortened one. This asks the engine for the same figure the automatic
+/// trigger uses, so the ring can be right about the present instead of the past.
+#[tauri::command]
+pub fn context_status(app: AppHandle, session_id: String) -> Result<ContextStatus, String> {
+    let Some(db) = app.try_state::<Db>() else {
+        return Err("engine: database unavailable".to_string());
+    };
+    let loaded = db.load_llm_messages(&session_id)?;
+    let baseline = db.session_usage(&session_id).unwrap_or(None);
+    let (used, basis) = prompt_size(baseline, &loaded);
+    Ok(ContextStatus {
+        used,
+        basis: basis.to_string(),
+    })
+}
+
 #[tauri::command]
 pub async fn engine_send(
     app: AppHandle,
@@ -1947,7 +1975,9 @@ async fn task_tool_with_snapshots(
     }
 
     let workspace = if config.workspace.trim().is_empty() {
-        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        crate::home_dir()
+            .map(|home| home.to_string_lossy().to_string())
+            .unwrap_or_default()
     } else {
         config.workspace.clone()
     };
@@ -2550,7 +2580,9 @@ async fn run_turn(
     cancel: Arc<AtomicBool>,
 ) -> (u64, Result<(), String>) {
     let workspace = if config.workspace.trim().is_empty() {
-        std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        crate::home_dir()
+            .map(|home| home.to_string_lossy().to_string())
+            .unwrap_or_default()
     } else {
         config.workspace.clone()
     };

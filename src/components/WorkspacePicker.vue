@@ -3,6 +3,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import Icon from "./Icon.vue";
 import { t } from "../i18n";
+import { isAbsolutePath } from "../composables/useWorkspace";
 
 /** A folder browser on top of the same `read_dir_children` command the file tree uses. */
 const props = defineProps<{ open: boolean; initial?: string }>();
@@ -59,7 +60,10 @@ async function load(path: string): Promise<boolean> {
 async function start(): Promise<void> {
   error.value = null;
   const initial = props.initial?.trim();
-  if (initial && (await load(initial))) {
+  // A relative path — a dot left over from the old default — names no folder to open: the
+  // listing came back empty and there was nothing to choose, which is what a Windows install
+  // showed. Skip it and start at home instead.
+  if (initial && isAbsolutePath(initial) && (await load(initial))) {
     void nextTick(() => input.value?.focus());
     return;
   }
@@ -90,7 +94,15 @@ onMounted(() => window.addEventListener("keydown", onKey, true));
 onBeforeUnmount(() => window.removeEventListener("keydown", onKey, true));
 
 function go(): void {
-  void load(pathDraft.value.trim());
+  const path = pathDraft.value.trim();
+  // "Öffnen" used to take anything, and a relative path listed whatever the process happened
+  // to sit in — or nothing. Only a full path names a place.
+  if (!isAbsolutePath(path)) {
+    error.value = t("workspacePicker.absoluteOnly");
+    return;
+  }
+  error.value = null;
+  void load(path);
 }
 
 function up(): void {

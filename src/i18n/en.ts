@@ -143,7 +143,7 @@ export const en: Messages = {
   schedules: {
     title: "Scheduled",
     hint: "Recurring prompts. They only run while DS·IDE is running — no background service.",
-    promptPlaceholder: "Task, e.g. \"Summarise the current git state\"",
+    promptPlaceholder: "Task, e.g. \"Summarise the current git state\" — Markdown is rendered",
     interval: "Every (minutes)",
     add: "Add",
     empty: "No scheduled tasks yet.",
@@ -274,6 +274,8 @@ export const en: Messages = {
     removeAttachment: "Remove attachment",
     model: "Model",
     contextHint: "{used} of {total} tokens in context ({percent}%)",
+    contextHintEstimated: "about {used} of {total} tokens ({percent}%) — estimated until the next request is counted",
+    compactFailed: "Compression failed:",
     compact: "Compress the context now",
     compacted: "{count} messages folded into a summary",
     compactNothing: "Nothing to compress — the conversation is short enough",
@@ -612,6 +614,7 @@ export const en: Messages = {
     cancel: "Cancel",
     loading: "Loading …",
     empty: "No subfolders.",
+    absoluteOnly: "Please give a full path, e.g. C:\\Users\\Name or /home/name."
   },
 
   about: {

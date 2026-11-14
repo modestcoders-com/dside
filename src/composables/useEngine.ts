@@ -324,6 +324,16 @@ export function initLastUsage(stored: unknown): void {
   }
 }
 
+/**
+ * Drops the measured usage. A compression shortens the history behind the provider's back, so
+ * its last report no longer describes what the next request will carry. Keeping it made a
+ * successful compression look like nothing had happened.
+ */
+export function clearLastUsage(): void {
+  lastUsage.value = null;
+  saveUiState("lastUsage", null);
+}
+
 let initialized = false;
 let initializing: Promise<void> | null = null;
 

@@ -47,8 +47,18 @@ export async function loadChildren(node: FileNode): Promise<void> {
   node.loaded = true;
 }
 
+/** True for a path that names a place: `/…` on Unix, `C:\…` or a UNC path on Windows. */
+export function isAbsolutePath(path: string): boolean {
+  const trimmed = path.trim();
+  return trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed) || trimmed.startsWith("\\\\");
+}
+
 export async function ensureWorkspace(): Promise<void> {
-  if (settings.workspace) return;
+  // A stored "." is a leftover: the default was `HOME` with a dot as fallback, and Windows has
+  // no `HOME`. Every fresh install there began with a dot that names no folder, so the field
+  // looked set while the file tree had nothing to show. Healing it here fixes an existing
+  // installation without asking the user to reinstall.
+  if (settings.workspace && isAbsolutePath(settings.workspace)) return;
   try {
     settings.workspace = await invoke<string>("default_workspace");
   } catch {

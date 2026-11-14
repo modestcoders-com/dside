@@ -142,7 +142,7 @@ export const de = {
   schedules: {
     title: "Geplant",
     hint: "Wiederkehrende Aufträge. Sie laufen nur, solange DS·IDE läuft — kein Hintergrunddienst.",
-    promptPlaceholder: "Auftrag, z. B. „Fasse den Git-Stand zusammen“",
+    promptPlaceholder: "Auftrag, z. B. „Fasse den Git-Stand zusammen“ — Markdown wird angezeigt",
     interval: "Alle (Minuten)",
     add: "Hinzufügen",
     empty: "Noch keine geplanten Aufträge.",
@@ -274,6 +274,8 @@ export const de = {
     removeAttachment: "Anhang entfernen",
     model: "Modell",
     contextHint: "{used} von {total} Token im Kontext ({percent} %)",
+    contextHintEstimated: "{used} von {total} Token geschätzt ({percent} %) — ab der nächsten Anfrage wird wieder gezählt",
+    compactFailed: "Verdichten fehlgeschlagen:",
     compact: "Kontext jetzt verdichten",
     compacted: "{count} Nachrichten zu einer Zusammenfassung verdichtet",
     compactNothing: "Nichts zu verdichten — der Verlauf ist kurz genug",
@@ -613,6 +615,7 @@ export const de = {
     cancel: "Abbrechen",
     loading: "Wird geladen …",
     empty: "Keine Unterordner.",
+    absoluteOnly: "Bitte einen vollständigen Pfad angeben, z. B. C:\\Benutzer\\Name oder /home/name."
   },
 
   about: {

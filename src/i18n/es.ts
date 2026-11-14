@@ -143,7 +143,7 @@ export const es: Messages = {
   schedules: {
     title: "Programado",
     hint: "Tareas recurrentes. Solo se ejecutan mientras DS.IDE corra — no hay servicio en segundo plano.",
-    promptPlaceholder: "Tarea, ej. \"Resuma el estado de Git\"",
+    promptPlaceholder: "Tarea, ej. \"Resuma el estado de Git\" — el Markdown se muestra",
     interval: "Cada (minutos)",
     add: "Añadir",
     empty: "Sin tareas programadas.",
@@ -275,6 +275,8 @@ export const es: Messages = {
     removeAttachment: "Quitar adjunto",
     model: "Modelo",
     contextHint: "{used} de {total} tokens en contexto ({percent} %)",
+    contextHintEstimated: "unos {used} de {total} tokens ({percent} %) — estimado hasta que se cuente la próxima consulta",
+    compactFailed: "Error al comprimir:",
     compact: "Comprimir el contexto ahora",
     compacted: "{count} mensajes resumidos",
     compactNothing: "Nada que comprimir: la conversación es corta",
@@ -609,6 +611,7 @@ export const es: Messages = {
     cancel: "Cancelar",
     loading: "Cargando …",
     empty: "No hay subcarpetas.",
+    absoluteOnly: "Indica una ruta completa, por ejemplo C:\\Users\\Nombre o /home/nombre."
   },
 
   about: {

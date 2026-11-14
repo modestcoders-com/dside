@@ -240,8 +240,14 @@ function onFiles(event: Event): void {
 /** A short-lived line under the field: what compression just did, or that there was nothing. */
 const note = ref<string | null>(null);
 
-function onCompacted(folded: number | null): void {
-  note.value = folded ? t("composer.compacted", { count: folded }) : t("composer.compactNothing");
+function onCompacted(folded: number | null, error: string | null): void {
+  // A failed compression is not an empty one. Saying "nothing to compress" in that case hid the
+  // reason behind a sentence that sounds like an answer.
+  note.value = error
+    ? `${t("composer.compactFailed")} ${error}`
+    : folded
+      ? t("composer.compacted", { count: folded })
+      : t("composer.compactNothing");
   // The summary that just replaced the older turns is the "where we were" card.
   void loadHistory(activeSessionId.value);
   window.setTimeout(() => {

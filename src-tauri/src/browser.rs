@@ -57,8 +57,15 @@ pub struct BrowserWindowInfo {
 /// Note: each window carries native chrome instead of a toolbar of ours. Putting our own
 /// toolbar above a foreign page needs Tauri's multi-webview support, which is behind the
 /// `unstable` feature flag — not something to ship in a product.
+///
+/// `async` is not decoration. Tauri runs a *synchronous* command on the thread that received the
+/// IPC call — the UI thread — and building a window from there waits for the event loop that is
+/// currently blocked. On GTK this got away with it; on Windows it deadlocked: the window appeared
+/// white, its close button did nothing, and even "Quit" in the tray had no effect because the
+/// loop never came back. An `async` command runs on the runtime instead, which is where window
+/// creation belongs.
 #[tauri::command]
-pub fn open_browser_window(
+pub async fn open_browser_window(
     app: AppHandle,
     url: String,
     new_window: Option<bool>,
@@ -86,7 +93,10 @@ pub fn open_browser_window(
     };
 
     let label = format!("{PREFIX}{slot}");
-    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(target))
+    // One line per window: without it a white window and a report of "the browser does not work"
+    // cannot be told apart from a window that never got created.
+    crate::log_line!("browser: opening {label} for {target}");
+    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(target.clone()))
         .title("DS·IDE — Browser")
         .inner_size(1120.0, 840.0)
         // Low enough to measure a narrow breakpoint (the companion's preview can ask for
@@ -95,7 +105,11 @@ pub fn open_browser_window(
         // Following the companion must not take the keyboard away from the composer.
         .focused(raise_after)
         .build()
-        .map_err(|error| format!("browser: {error}"))?;
+        .map_err(|error| {
+            crate::log_line!("browser: {label} failed: {error}");
+            format!("browser: {error}")
+        })?;
+    crate::log_line!("browser: {label} built for {target}");
     if raise_after {
         raise(&window);
     }
@@ -418,7 +432,7 @@ pub async fn browser_open_read(app: AppHandle, value: String) -> Result<BrowserP
     if url.is_empty() {
         return Err("browser: empty url".to_string());
     }
-    let label = open_browser_window(app.clone(), url, Some(true), Some(false))?;
+    let label = open_browser_window(app.clone(), url, Some(true), Some(false)).await?;
     read_when_loaded(app, label).await
 }
 
@@ -464,7 +478,7 @@ pub async fn show_preview_read(app: AppHandle, url: String) -> Result<BrowserPag
                 .map_err(|error| format!("browser: {error}"))?;
             window.label().to_string()
         }
-        None => open_browser_window(app.clone(), url, Some(true), Some(false))?,
+        None => open_browser_window(app.clone(), url, Some(true), Some(false)).await?,
     };
     read_when_loaded(app, label).await
 }

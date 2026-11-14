@@ -5281,3 +5281,128 @@ bei linuxdeploy ankommt und dass `zsync` auf `ubuntu-22.04` verfügbar ist.
 HTTP 200. Damit ist die Kette vollständig — Zeiger im Paket, Kontroll-Datei auf der Release-Seite,
 Ziel erreichbar. Ob Shelly daraus tatsächlich aktualisiert, zeigt erst der nächste Versionssprung;
 das bleibt die eine unbelegte Behauptung dieser Runde.
+
+## 123. Der Kontextring zeigte nach der Verdichtung den alten Stand (2026-11-14)
+
+Gemeldet: „Die Kontextkomprimierung (als clickevent) scheint entweder nicht zu funktionieren oder
+der Stand der Kontextlänge wird nicht aktualisiert", nach zwei Klicks unverändert bei ~60 %.
+
+### Die Verdichtung funktioniert — nachgewiesen, nicht angenommen
+In seiner Datenbank (Kopie, nur lesend) steht genau eine Zusammenfassung:
+`s1792096420929`, gefaltet bis Nachricht **#694**, 6 350 Zeichen, geschrieben 10:49:55 Uhr.
+Von 124 Nachrichten liegen exakt **8** danach — das ist `KEEP_RECENT`. Der erste Klick hat also
+116 Nachrichten verdichtet. Der zweite fand 8 ≤ 8 und gab `Ok(None)` zurück: „Nichts zu
+verdichten" — richtig, nicht kaputt.
+
+### Der Fehler war die Anzeige
+Der Ring las `lastUsage.promptTokens`, den Verbrauchswert der **letzten Anfrage**. Der ist exakt,
+aber er beschreibt eine Historie, die es nach der Verdichtung nicht mehr gibt — und er wird in
+der Oberfläche gespeichert und beim Start wiederhergestellt. Ergebnis: nach der Verdichtung stand
+weiter 628 392 von 1 048 576 (60 %), und ein erfolgreicher Vorgang sah aus wie ein No-Op.
+
+**Änderung:** neue Engine-Abfrage `context_status`, die genau die Zahl liefert, mit der auch die
+automatische Verdichtung entscheidet (`prompt_size`: gemessener Wert plus Zuwachs, sonst
+Schätzung). Der Ring fragt sie beim Start, nach jedem Verbrauchswert und nach dem Verdichten. Die
+rohe Messung als zweite Quelle ist entfallen — sie war die Falle. Ist der Wert geschätzt, sagt der
+Tooltip es; ein Erfolg ist nicht mehr von einem Fehler zu unterscheiden, weil ein Fehlschlag jetzt
+mit Grund gemeldet wird statt als „nichts zu verdichten".
+
+### Geprüft — im gepackten Debug-Build, gegen eine Kopie seiner Datenbank
+- mit vorhandener Zusammenfassung: **36 850 Token (4 %)**, „geschätzt" — vorher 628 392 (60 %)
+- Gegenprobe ohne Zusammenfassung (in der Kopie gelöscht): 482 673 (46 %), ebenfalls geschätzt
+- Klick im laufenden Programm: Meldung „Nichts zu verdichten", Ring bleibt bei 4 % —
+  der Vermerk ist korrekt, weil nur noch acht Nachrichten da sind
+- `cargo test --lib` 94 / 14 ignoriert, `vue-tsc` grün, i18n 523 Schlüssel (zwei neu)
+
+**Nicht geprüft:** ein Klick, der tatsächlich verdichtet — dafür bräuchte es einen echten
+Modellaufruf und damit seine Zugangsdaten und Guthaben. Der Zustand danach ist der, den seine
+Datenbank bereits zeigt, und genau der ist oben gemessen.
+
+### Ein Nebenbefund, nicht behoben
+`prompt_size` benutzt die gespeicherte Messung nur, solange die Zahl der geladenen Nachrichten
+dazu passt. Sobald beim Laden verwaiste Werkzeug-Ergebnisse aussortiert werden, passt sie nicht
+mehr, und es bleibt bei der Schätzung (in seinem Verlauf: 687 gespeichert, 715 Zeilen, einige
+verwaist). Die Schätzung übersieht den System-Prompt — bei 1 Mio. Kontext ist das zu
+vernachlässigen; genauer wäre, die Messung anhand von `session_summaries.created_at` gegen
+`session_usage.updated_at` zu prüfen statt über die Anzahl. Steht in `TODO.md`.
+
+## 124. Geplante Aufträge: wachsende Eingabe und lesbare Anzeige (2026-11-14)
+
+Gemeldet: Das Eingabefeld für den Auftrag soll mitwachsen, und „Formatierung im Text wäre schon
+schön". Gefragt war auch, ob der Text nur Text oder Markdown ist.
+
+### Was der Auftrag ist
+Reiner Text — er wird als Nachricht an den Begleiter geschickt, genau so, wie er getippt wurde.
+Markdown ist im *Inhalt* erlaubt, aber ohne Auszeichnung keine Formatierung: der Speicher enthält
+den Quelltext (`schedules.prompt`), und das ist richtig so, weil das Modell ihn lesen soll.
+
+### Zwei echte Mängel in der Oberfläche
+1. **Zeilenumbrüche verschwanden.** `.prompt` hatte kein `white-space`; ein sechszeiliger Auftrag
+   stand als ein einziger Absatz da. Genau das war auf dem Bildschirm zu sehen.
+2. **Das Feld war zwei Zeilen hoch und nicht veränderbar** (`resize: none`), während ein Auftrag
+   leicht ein Dutzend Zeilen hat.
+
+**Änderung:** Das Textfeld wächst beim Tippen bis zwölf Zeilen (18 px pro Zeile) und scrollt
+darüber hinaus; beim Leeren fällt es auf die Ausgangshöhe zurück. Die Anzeige rendert den Auftrag
+als Markdown über `MarkdownText` — dieselbe Komponente wie im Chat, mit neuer Eigenschaft `bare`,
+die den Blasenrahmen weglässt, weil die Karte den Rahmen schon zeichnet. Absätze, Listen,
+Hervorhebungen und Code erscheinen damit so, wie sie geschrieben wurden.
+
+Die Höhe musste auf einen Wrapper: auf der Komponentenwurzel verlor `padding-right` gegen
+`.text.bare { padding: 0 }` derselben Spezifität — gemessen, nicht vermutet (`paddingRight: 0px`,
+nach dem Umbau `52px`).
+
+### Geprüft — im gepackten Debug-Build, gegen eine Kopie der Datenbank
+- Wachsen: 40 → 166 px bei neun Zeilen; Deckel bei **216 px** (zwölf Zeilen), danach scrollt es
+- Schrumpfen: zurück auf 40 px
+- Markdown: `##`, `<ol>`, `<strong>`, `<code>` erscheinen im Eintrag; der sechszeilige Bestand
+  bekommt jetzt zwei Absätze statt eines Blocks
+- Abstand zu den Knöpfen: `padding-right: 52px` greift
+- **Sicherheit:** der Text geht durch `renderMarkdown` mit DOMPurify. Probe mit einem
+  `<img onerror=…>` und einem `<script>`: das Skript ist entfernt, `onerror` entfernt, das Bild
+  behält nur `src` — und der Markdown-Anteil funktioniert weiter.
+- i18n 523 Schlüssel (nur der Platzhalter ergänzt), `vue-tsc` grün
+
+**Nicht geprüft:** ein echter geplanter Lauf. Die Ausführung selbst wurde nicht angefasst.
+
+## 125. Windows: ein Punkt als Arbeitsordner, und ein Fenster, das die Schleife blockiert (2026-11-14)
+
+Erster Ausflug auf Windows 11 (ein 2013er MacBook Pro, das noch läuft). Der Bericht kam in zwei
+Teilen, weil ein Punkt sich als Fehlalarm erwies: Einstellungen und API-Schlüssel waren nicht
+verloren — das war ein Start als Administrator mit anderem Theme und einmalig weißem Splash.
+
+### `.` als Arbeitsordner
+In `Einstellungen → Allgemein` stand in beiden Pfadfeldern ein einzelner Punkt, und die Ordnerwahl
+zeigte keine Auswahl. Ursache: `default_workspace` las `HOME`, mit `"."` als Ersatz. Windows setzt
+`HOME` nicht — es hat `USERPROFILE`. Ein frisch installiertes Paket startete dort also mit `.`,
+einem Pfad, der keinen Ordner benennt.
+
+Dasselbe Muster steckte an acht Stellen: `skills_root` (Skills landeten im Startverzeichnis),
+zweimal der Werkzeug-Arbeitsordner in der Engine, die Desktop-Verzeichnisliste und `data_dir`.
+
+**Änderung:** eine Funktion `home_dir()` für alle Plattformen — `HOME`, sonst `USERPROFILE`, sonst
+`HOMEDRIVE`+`HOMEPATH` — und alle Aufrufer darauf umgestellt. Ein gespeichertes `.` heilt sich
+selbst: `ensureWorkspace` ersetzt es beim Start, und die Ordnerwahl überspringt einen relativen
+Anfangswert statt ein leeres Fenster zu zeigen. „Öffnen" nimmt nur noch vollständige Pfade und sagt
+sonst, warum (neuer Text in allen sechs Katalogen).
+
+### Der Browser blockierte die Ereignisschleife
+Weiße Seite im Browserfenster, das X wirkungslos, und auch „Beenden" im Tray ohne Wirkung — alle
+drei Symptome dasselbe: `open_browser_window` war eine **synchrone** Tauri-Befehle, und die laufen
+auf dem Thread, der den Aufruf bekommt — dem UI-Thread. Ein Fenster von dort zu bauen wartet auf
+eine Schleife, die gerade blockiert. Unter GTK ging das durch, unter Windows nicht.
+
+**Änderung:** `async`, damit der Befehl auf der Laufzeit läuft, wo Fensterbau hingehört; die zwei
+internen Aufrufer ziehen mit (`.await`). Dazu zwei Logzeilen beim Öffnen — ohne sie lässt sich
+„das Fenster ist weiß" nicht von „das Fenster entstand nie" unterscheiden.
+
+### Geprüft
+`cargo test --lib` **95** / 14 ignoriert (neu: `the_default_workspace_is_a_real_folder` — er prüft,
+dass der Standard absolut ist, existiert und nicht `.` heißt), i18n 524 Schlüssel, `vue-tsc` grün.
+Im gepackten Debug-Build: Fenster öffnet in **26 ms**, `example.com` rendert (917 Zeichen,
+Titel „Example Domain"), `browser_close` entfernt es, und im Log stehen beide Zeilen.
+
+**Nicht geprüft, und das ist der Punkt:** ob die Windows-Diagnose stimmt. Ich habe keinen Windows-
+Rechner; die Begründung stammt aus dem Code und der dokumentierten Regel, dass synchrone Befehle auf
+dem Hauptthread laufen. Der Testlauf dort steht aus — und wenn die weiße Seite bleibt, sagen die
+neuen Logzeilen, ob das Fenster gebaut wurde.

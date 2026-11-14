@@ -143,7 +143,7 @@ export const ru: Messages = {
   schedules: {
     title: "Запланировано",
     hint: "Повторяющиеся задачи. Они работают только пока работает DS.IDE — без фонового сервиса.",
-    promptPlaceholder: "Введите задачу, например «Формирование Git-статуса»",
+    promptPlaceholder: "Введите задачу, например «Формирование Git-статуса» — Markdown отображается",
     interval: "Каждые (минуты)",
     add: "Добавить",
     empty: "Ни запланированных задач.",
@@ -274,6 +274,8 @@ export const ru: Messages = {
     removeAttachment: "Убрать вложение",
     model: "Модель",
     contextHint: "{used} из {total} токенов в контексте ({percent} %)",
+    contextHintEstimated: "примерно {used} из {total} токенов ({percent} %) — оценка до подсчёта следующего запроса",
+    compactFailed: "Не удалось сжать:",
     compact: "Сжать контекст сейчас",
     compacted: "{count} сообщений свёрнуты в резюме",
     compactNothing: "Сжимать нечего — разговор ещё короткий",
@@ -608,6 +610,7 @@ export const ru: Messages = {
     cancel: "Отмена",
     loading: "Загрузка …",
     empty: "Нет подпапок.",
+    absoluteOnly: "Укажите полный путь, например C:\\Users\\Name или /home/name."
   },
 
   about: {

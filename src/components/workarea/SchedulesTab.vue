@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { nextTick, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import Icon from "../Icon.vue";
+import MarkdownText from "../agent/MarkdownText.vue";
 import { t } from "../../i18n";
 import { activeSessionId } from "../../stores/sessions";
 
@@ -19,6 +20,34 @@ const rows = ref<ScheduleRow[]>([]);
 const draft = ref("");
 const minutes = ref(60);
 const loading = ref(false);
+
+/**
+ * The field grows with the instruction. A work order is often several lines — the one this was
+ * reported for ran to six — and a fixed two-row box hid most of it while typing.
+ */
+const field = ref<HTMLTextAreaElement | null>(null);
+const LINE_HEIGHT = 18;
+const MAX_ROWS = 12;
+
+function autoGrow(): void {
+  const element = field.value;
+  if (!element) return;
+  // Nothing to measure before the panel is laid out; `scrollHeight` would report the maximum.
+  if (element.getBoundingClientRect().width === 0) return;
+  if (!element.value.trim()) {
+    element.style.height = "";
+    return;
+  }
+  element.style.height = "auto";
+  element.style.height = `${Math.min(element.scrollHeight, MAX_ROWS * LINE_HEIGHT)}px`;
+}
+
+async function resetDraft(): Promise<void> {
+  draft.value = "";
+  await nextTick();
+  // The inline height belongs to the text that just left; the stylesheet's height is right again.
+  if (field.value) field.value.style.height = "";
+}
 
 async function load() {
   loading.value = true;
@@ -39,7 +68,7 @@ async function add() {
     prompt,
     intervalSeconds: Math.max(1, Math.round(minutes.value)) * 60,
   });
-  draft.value = "";
+  await resetDraft();
   await load();
 }
 
@@ -79,7 +108,13 @@ onMounted(() => {
     </header>
 
     <form class="form" @submit.prevent="add">
-      <textarea v-model="draft" rows="2" :placeholder="t('schedules.promptPlaceholder')"></textarea>
+      <textarea
+        ref="field"
+        v-model="draft"
+        rows="2"
+        :placeholder="t('schedules.promptPlaceholder')"
+        @input="autoGrow"
+      ></textarea>
       <div class="form-row">
         <label class="interval">
           <span>{{ t("schedules.interval") }}</span>
@@ -97,7 +132,9 @@ onMounted(() => {
 
     <ul v-else class="list">
       <li v-for="row in rows" :key="row.id" class="entry" :class="{ off: !row.enabled }">
-        <p class="prompt">{{ row.prompt }}</p>
+        <!-- The padding lives on a wrapper: on the component root it lost against the
+             component's own `.text.bare { padding: 0 }` (equal specificity, later rule). -->
+        <div class="prompt"><MarkdownText :text="row.prompt" bare /></div>
         <div class="meta">
           <span>⏱ {{ Math.round(row.intervalSeconds / 60) }} min</span>
           <span>{{ t("schedules.next") }}: {{ formatTime(row.nextRunAt) }}</span>
@@ -180,6 +217,10 @@ onMounted(() => {
   color: var(--text);
   font: inherit;
   font-size: 12px;
+  /* The height is set from `scrollHeight` in steps of exactly this line height, so the box
+     never ends mid-line; beyond `MAX_ROWS` it scrolls instead of growing further. */
+  line-height: 18px;
+  overflow-y: auto;
 }
 
 .form-row {
@@ -252,9 +293,6 @@ onMounted(() => {
 
 .prompt {
   margin: 0 0 6px;
-  color: var(--text);
-  font-size: 12px;
-  line-height: 1.45;
   padding-right: 52px;
 }
 

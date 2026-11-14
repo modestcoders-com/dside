@@ -142,7 +142,7 @@ export const fr: Messages = {
   schedules: {
     title: "Planifié",
     hint: "Tâches récurrentes. Elles ne fonctionnent que pendant que DS.IDE est en cours d'exécution — pas de service en arrière-plan.",
-    promptPlaceholder: "Tâche, par ex. « Fais un résumé de l'état Git »",
+    promptPlaceholder: "Tâche, par ex. « Fais un résumé de l'état Git » — le Markdown est affiché",
     interval: "Toutes les minutes",
     add: "Ajouter",
     empty: "Aucune tâche planifiée.",
@@ -273,6 +273,8 @@ export const fr: Messages = {
     removeAttachment: "Retirer la pièce jointe",
     model: "Modèle",
     contextHint: "{used} sur {total} jetons en contexte ({percent} %)",
+    contextHintEstimated: "environ {used} sur {total} jetons ({percent} %) — estimé jusqu'au décompte de la prochaine requête",
+    compactFailed: "Échec de la compression :",
     compact: "Compresser le contexte maintenant",
     compacted: "{count} messages résumés",
     compactNothing: "Rien à compresser — la conversation est assez courte",
@@ -611,6 +613,7 @@ export const fr: Messages = {
     cancel: "Annuler",
     loading: "Chargement …",
     empty: "Aucun sous-dossier.",
+    absoluteOnly: "Indique un chemin complet, par ex. C:\\Users\\Nom ou /home/nom."
   },
 
   about: {

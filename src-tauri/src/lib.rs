@@ -185,9 +185,9 @@ fn desktop_directories() -> Vec<PathBuf> {
         PathBuf::from("/usr/local/share/applications"),
         PathBuf::from("/var/lib/flatpak/exports/share/applications"),
     ];
-    if let Ok(home) = std::env::var("HOME") {
-        dirs.push(PathBuf::from(&home).join(".local/share/applications"));
-        dirs.push(PathBuf::from(&home).join(".local/share/flatpak/exports/share/applications"));
+    if let Some(home) = home_dir() {
+        dirs.push(home.join(".local/share/applications"));
+        dirs.push(home.join(".local/share/flatpak/exports/share/applications"));
     }
     dirs
 }
@@ -873,9 +873,8 @@ pub(crate) fn base64_encode(bytes: &[u8]) -> String {
 /// misunderstanding waiting to happen.
 pub fn data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     if std::env::var_os("FLATPAK_ID").is_some() {
-        if let Some(home) = std::env::var_os("HOME") {
-            let shared = std::path::PathBuf::from(home)
-                .join(".local/share/com.deepvibe.ds-ide");
+        if let Some(home) = home_dir() {
+            let shared = home.join(".local/share/com.deepvibe.ds-ide");
             if shared.is_dir() || std::fs::create_dir_all(&shared).is_ok() {
                 return Ok(shared);
             }
@@ -906,9 +905,34 @@ fn set_project_title(window: tauri::Window, workspace: String) -> Result<(), Str
         .map_err(|error| error.to_string())
 }
 
+/// The user's home directory, on every platform.
+///
+/// This used to be `std::env::var("HOME")` in eight places, with `"."` as the fallback. Windows
+/// does not set `HOME`, so a packaged build fell back to a single dot — which then became the
+/// workspace, the skills folder and the folder picker's starting point. Measured on Windows 11:
+/// both path fields in Settings showed `.`, and the picker could not list anything because there
+/// is no directory named `.` to open from there.
+pub fn home_dir() -> Option<PathBuf> {
+    for key in ["HOME", "USERPROFILE"] {
+        if let Some(value) = std::env::var_os(key).filter(|value| !value.is_empty()) {
+            return Some(PathBuf::from(value));
+        }
+    }
+    // A Windows service account has neither: it gets drive and path separately.
+    let drive = std::env::var_os("HOMEDRIVE").filter(|value| !value.is_empty())?;
+    let path = std::env::var_os("HOMEPATH").filter(|value| !value.is_empty())?;
+    let mut combined = drive;
+    combined.push(path);
+    Some(PathBuf::from(combined))
+}
+
 #[tauri::command]
 fn default_workspace() -> String {
-    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    // An empty answer is honest: the picker then starts at the home directory and the user
+    // chooses. A dot is not a folder anyone can name.
+    home_dir()
+        .map(|home| home.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 /// The name pool the partner may browse. Embedded at compile time, so it works the same in a
@@ -1351,6 +1375,7 @@ pub fn run() {
             engine::engine_send,
             engine::engine_retry,
             engine::session_compact,
+            engine::context_status,
             engine::engine_models,
             engine::provider_balance,
             browser::open_browser_window,
@@ -1481,6 +1506,21 @@ mod tests {
 
     /// The project dropdown is fed from here: directories only, sorted, and a wrong base path
     /// has to fail loudly instead of showing an empty list that looks like "no projects".
+    /// The workspace default must be a real, absolute folder on every platform. It used to be
+    /// `HOME`-or-dot, and Windows has no `HOME` — so a fresh install there began with `.`, which
+    /// names nothing. This test would have caught it on Linux only in the sense that it asserts
+    /// the property that was missing: the result is absolute and exists.
+    #[test]
+    fn the_default_workspace_is_a_real_folder() {
+        let home = home_dir().expect("a home directory exists");
+        assert!(home.is_absolute(), "home must be absolute: {}", home.display());
+        assert!(home.is_dir(), "home must exist: {}", home.display());
+        let workspace = default_workspace();
+        assert!(!workspace.is_empty(), "the default workspace must not be empty");
+        assert_ne!(workspace, ".", "a dot names no folder");
+        assert!(std::path::Path::new(&workspace).is_absolute(), "{workspace}");
+    }
+
     #[test]
     fn the_project_folders_are_directories_sorted_by_name() {
         let base = std::env::temp_dir().join(format!("ds-ide-folders-{}", std::process::id()));

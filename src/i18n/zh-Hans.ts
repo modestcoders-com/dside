@@ -142,7 +142,7 @@ export const zhHans: Messages = {
   schedules: {
     title: "计划",
     hint: "循环任务。仅在 DS·IDE 运行时执行 — 无后台服务。",
-    promptPlaceholder: "任务，例如 „总结 Git 状态“",
+    promptPlaceholder: "任务，例如 „总结 Git 状态“——Markdown 会被渲染显示",
     interval: "间隔 (分钟)",
     add: "添加",
     empty: "没有计划中的任务。",
@@ -272,6 +272,8 @@ export const zhHans: Messages = {
     removeAttachment: "移除附件",
     model: "模型",
     contextHint: "上下文中已用 {used} / {total} 词元（{percent}%）",
+    contextHintEstimated: "约为 {used} / {total} 词元（{percent}%）——在下一次请求计数前为估算值",
+    compactFailed: "压缩失败：",
     compact: "立即压缩上下文",
     compacted: "已将 {count} 条消息合并为摘要",
     compactNothing: "无需压缩——对话还足够短",
@@ -607,6 +609,7 @@ export const zhHans: Messages = {
     cancel: "取消",
     loading: "正在加载…",
     empty: "没有子文件夹。",
+    absoluteOnly: "请填写完整路径，例如 C:\\Users\\Name 或 /home/name。"
   },
 
   about: {

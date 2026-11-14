@@ -7,6 +7,8 @@ const props = defineProps<{
   user?: boolean;
   streaming?: boolean;
   tooltip?: string;
+  /** No bubble: the text is part of a card that already has a border (the schedule list). */
+  bare?: boolean;
 }>();
 
 /**
@@ -24,7 +26,7 @@ const html = computed(() =>
 <template>
   <div
     class="text"
-    :class="{ user, streaming }"
+    :class="{ user, streaming, bare }"
     :title="tooltip"
     v-html="html"
   ></div>
@@ -51,6 +53,15 @@ const html = computed(() =>
   border: 1px solid var(--bubble-border);
   border-radius: var(--radius);
   background-color: var(--bubble-user-bg);
+}
+
+/* Inside a card that already draws the frame, the text is only text. */
+.text.bare {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .text :deep(p) {

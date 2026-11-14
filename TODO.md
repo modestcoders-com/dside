@@ -72,8 +72,21 @@ this file is the list of what has not.
   not told — not from a different brain. Open: how its objection is recorded in the chronicle,
   and whether it also gates destructive commands and deletions.
 
+- **The context ring estimates instead of measuring when the loaded history is shorter than the
+  stored count.** `prompt_size` only trusts the provider's report while the number of loaded
+  messages matches it; orphaned tool results (dropped at load time) break that match. Comparing
+  `session_summaries.created_at` with `session_usage.updated_at` would separate "compressed" from
+  "a few rows skipped" and make the exact figure usable again. Cosmetic at a 1M context.
+
 ## Known limits, not planned work
 
+- **A Windows test needs a person.** Nothing here runs Windows; the build is checked by CI only.
+  When something is reported from that machine, the honest steps are a hypothesis from the code,
+  a log line that can be read back, and the user's report as the measurement — not a claim that it
+  is fixed.
+- **Synchronous Tauri commands run on the UI thread.** `open_browser_window` blocked there and
+  deadlocked on Windows (§125). Other sync commands have not been audited for the same pattern;
+  anything that waits for the event loop must be `async`.
 - Windows and macOS builds are unsigned and have never run on real hardware. Only the CI builds
   them.
 - Sandbox-only code paths are now unreachable: `FLATPAK_ID` in `lib.rs`, `portal.rs` and
@@ -87,9 +100,9 @@ this file is the list of what has not.
 
 ## Outside this repository
 
-- **peer²'s Flatpak and Arch builds fail in CI** (`github.com/modestcoders-com/peer2`). Two
-  causes, both diagnosed and both a one-line fix: the Flatpak job runs on `ubuntu-22.04`, whose
-  `flatpak-builder` calls `appstream-compose`, which the GNOME 50 SDK no longer ships (needs
-  `ubuntu-24.04`); and the Arch container installs pnpm 12, which ignores the `pnpm.overrides`
-  field in `package.json`, so `--frozen-lockfile` fails (needs `npm i -g pnpm@10`, as `AGENTS.md`
-  in both projects already says).
+- **peer²'s CI** (`github.com/modestcoders-com/peer2`). The Flatpak job is obsolete — there will be
+  no Flatpak for peer² either. The `arch` job still fails with `ERR_PNPM_LOCKFILE_CONFIG_MISMATCH`:
+  the `archlinux:base-devel` container installs pnpm from the Arch repositories, which is now 12
+  and ignores `pnpm.overrides` (the lockfile was written with pnpm 10). One line: pin
+  `npm i -g pnpm@10` in that job, as `AGENTS.md` in both projects says. The maintainer is passing
+  this on; the repository is not ours to change.
