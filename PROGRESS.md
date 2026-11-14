@@ -5530,3 +5530,20 @@ Willkommensdialog, dort über den `.`-Rückfall. Dasselbe gilt für den `PROGRES
 Dateien sind auseinandergelaufen. Wer sie zusammenführt, muss die Abschnitte umnummerieren; dieser
 Abschnitt ist der Versuch, den Stand der anderen Seite hier festzuhalten, ohne ihre Arbeit zu
 überschreiben.
+
+### Veröffentlicht
+`v0.6.5`, `latest`, 8 Assets (deb, rpm, AppImage, **AppImage.zsync**, linux-tar.gz, dmg,
+Windows-Zip, `.exe`). Alle vier CI-Jobs grün beim ersten Lauf. Nachgeprüft am veröffentlichten
+Stand: `.zsync` lädt mit HTTP 200 (310 574 bytes), ihr `URL`-Header zeigt auf das AppImage, das
+antwortet mit HTTP 200.
+
+Am gebauten Paket vor dem Tag: `Categories=Development;` in `.deb` und AppImage,
+`X-AppImage-Version=0.6.5`, `.upd_info` mit Update-Zeiger. Beim Start (Kopie der Datenbank):
+`data: <Pfad> (linux)` und `settings: read 32 keys, firstRun=false`; zweiter Start lässt die
+Prozesszahl bei **1** und schreibt `instance: second start, raising the existing window`. Der
+`.deb`-Lauf mit leerem Datenverzeichnis meldet `read 0 keys, firstRun=true` — die Gegenprobe, dass
+eine wirklich frische Installation weiterhin den Dialog bekommt.
+
+**Der nächste Schritt für die Ursache** (nicht in dieser Runde): das Hauptfenster erst in `setup`
+erzeugen, nachdem `Db` und `SecretStore` verwaltet sind. Steht in `TODO.md` bei den bekannten
+Grenzen; es ist ein Umbau am Startpfad samt Splash-Übergabe.
