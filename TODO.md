@@ -3,7 +3,7 @@
 What is left, in the order I would do it. `PROGRESS.md` is the record of what happened;
 this file is the list of what has not.
 
-## Done in the 0.6.5 round (unreleased)
+## Done in 0.6.5 (published 2026-11-15)
 
 - **One instance.** A second start raises the existing window instead of adding a copy; seven of
   them sat in the task bar at once, each with its own tray icon on the same database.
@@ -24,10 +24,11 @@ this file is the list of what has not.
 
 *Nothing left here at the moment.*
 
-## Done in the 0.6.3 round (unreleased, gathering)
+## Done in 0.6.3 (published 2026-11-13)
 
 - **Desktop categories.** `bundle.category = DeveloperTool` — without it both the AppImage and
-  the `.deb` carried `Categories=` empty, and KDE put the app in no menu branch at all.
+  the `.deb` carried `Categories=` empty, and KDE put the app in no menu branch at all. Confirmed
+  on the actual desktop: DS.IDE appears under "Entwicklung".
 - **A dead `.desktop` file no longer counts as an installed editor.** The PATH branch checked
   executability, the desktop branch trusted the file; a launcher left behind by a removed
   program appeared in the picker and failed on every click.

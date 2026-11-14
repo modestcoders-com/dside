@@ -5558,3 +5558,12 @@ Messung geworden.
 **Offen bleibt der letzte Schritt:** dass der Klick auf „Update" das Paket wirklich herunterlädt
 und austauscht. Das ist eine eigene Handlung und braucht einen echten Versionssprung mit einem
 Klick — nicht mehr zu beweisen durch Nachsehen.
+
+### Und der Menüeintrag steht auch
+Im Plasma-Menü erscheint **DS·IDE unter „Entwicklung"**, mit dem „Neu!"-Abzeichen für eine frisch
+installierte App. Damit ist auch §120 am echten Desktop belegt: `bundle.category = DeveloperTool`
+schreibt `Categories=Development;` in die `.desktop`, und KDE ordnet den Eintrag ein. Die leere
+Zeile vorher hatte die App in keinen Zweig gestellt — der Eintrag war da, nur unsichtbar.
+
+Zwei Beweise an einem Abend, beide für Fehler, die nur an einem Ort sichtbar waren: Shellys
+Update-Vorschlag (Datei, Zeiger, Vergleich) und der Menüzweig (Kategorie, Cache, Ordner).
