@@ -42,8 +42,9 @@ this file is the list of what has not.
   with the release. Measured on a local 0.6.2 build: `.upd_info` carries
   `gh-releases-zsync|modestcoders-com|dside|latest|DS.IDE_*_amd64.AppImage.zsync`, the embedded
   `.desktop` carries `X-AppImage-Version=0.6.2`, and the control file has `Filename`, `MTime`,
-  `URL`, `SHA-1`. **Not proven:** that Shelly performs the update — that needs a release which
-  ships the `.zsync`, so it is the first thing to watch after 0.6.3.
+  `URL`, `SHA-1`. **Proven 2026-11-15:** Shelly reads the installed copy as `v0.6.2` and offers
+  `v0.6.5` — discovery works, i.e. version, pointer and comparison. **Still unproven:** that the
+  download and replacement actually succeed, which needs one click on that update.
 
 ## Wanted, needs a decision (not a defect)
 

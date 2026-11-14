@@ -5547,3 +5547,14 @@ eine wirklich frische Installation weiterhin den Dialog bekommt.
 **Der nächste Schritt für die Ursache** (nicht in dieser Runde): das Hauptfenster erst in `setup`
 erzeugen, nachdem `Db` und `SecretStore` verwaltet sind. Steht in `TODO.md` bei den bekannten
 Grenzen; es ist ein Umbau am Startpfad samt Splash-Übergabe.
+
+### Die Update-Kette ist belegt — bis zum Vorschlag
+`v0.6.2` installiert, Shelly meldet **„Update verfügbar: v0.6.5"** und zeigt Name, Marke und
+Beschreibung aus der Datei. Damit ist bewiesen, was seit §121 offen war: Die AppImage liest ihre
+eigene Version (`X-AppImage-Version`), findet über den eingebetteten Zeiger die Release-Seite,
+holt die `.zsync` und vergleicht mit dem neuesten Release. Aus „begründete Erwartung" ist eine
+Messung geworden.
+
+**Offen bleibt der letzte Schritt:** dass der Klick auf „Update" das Paket wirklich herunterlädt
+und austauscht. Das ist eine eigene Handlung und braucht einen echten Versionssprung mit einem
+Klick — nicht mehr zu beweisen durch Nachsehen.
