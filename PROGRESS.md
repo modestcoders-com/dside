@@ -5406,3 +5406,12 @@ Titel „Example Domain"), `browser_close` entfernt es, und im Log stehen beide 
 Rechner; die Begründung stammt aus dem Code und der dokumentierten Regel, dass synchrone Befehle auf
 dem Hauptthread laufen. Der Testlauf dort steht aus — und wenn die weiße Seite bleibt, sagen die
 neuen Logzeilen, ob das Fenster gebaut wurde.
+
+### Veröffentlicht
+`v0.6.4`, `latest`, 8 Assets (deb, rpm, AppImage, **AppImage.zsync**, linux-tar.gz, dmg,
+Windows-Zip, `.exe`). Alle vier CI-Jobs grün beim ersten Lauf — auch Windows. Am veröffentlichten
+Stand nachgeprüft: die `.zsync` lädt mit HTTP 200 (310 238 bytes), ihr `URL`-Header zeigt auf das
+AppImage, das antwortet mit HTTP 200. Am CI-Paket selbst: `.upd_info` trägt den Update-Zeiger.
+
+Mit dieser Runde ist der Test offen, den 0.6.3 nicht liefern konnte: ob Shelly aus der 0.6.3 auf
+0.6.4 aktualisiert — `shelly list-updates appimage` sollte 0.6.4 sehen.
