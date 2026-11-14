@@ -3,6 +3,23 @@
 What is left, in the order I would do it. `PROGRESS.md` is the record of what happened;
 this file is the list of what has not.
 
+## Done in the 0.6.5 round (unreleased)
+
+- **One instance.** A second start raises the existing window instead of adding a copy; seven of
+  them sat in the task bar at once, each with its own tray icon on the same database.
+- **A read failure is not an empty database.** Settings are read with twelve attempts (~4 s); a
+  final failure shows a banner and writes nothing, instead of greeting an existing installation
+  with the first-start dialog and then overwriting its values with defaults.
+- **Onboarding and shutdown write immediately** (`flushSettings`, plus a flush when the window is
+  hidden), and every failed `settings_set` lands in the log.
+- **Boot steps are independent.** A failing keyring read no longer costs the sessions, the file
+  tree and the history — each step logs `ui: init: <step> failed: …` and the rest continues.
+- **A stored `.` no longer comes back.** `adoptSessionWorkspace` re-binds the session to the real
+  folder instead of adopting the relative path; `activateProject` and `bindActiveThread` refuse
+  relative paths. Proven by reproducing the Windows state on a copy.
+- **Two start-up log lines**: `data: <path> (<os>)` and `settings: read <n> keys, firstRun=…`,
+  which are what make a report from a machine I cannot see answerable.
+
 ## Ready, small, no design needed
 
 *Nothing left here at the moment.*
@@ -85,10 +102,17 @@ this file is the list of what has not.
   a log line that can be read back, and the user's report as the measurement — not a claim that it
   is fixed.
 - **Synchronous Tauri commands run on the UI thread.** `open_browser_window` blocked there and
-  deadlocked on Windows (§125). Other sync commands have not been audited for the same pattern;
-  anything that waits for the event loop must be `async`.
-- Windows and macOS builds are unsigned and have never run on real hardware. Only the CI builds
-  them.
+  deadlocked on Windows (§125) — and with 0.6.4 the browser window was confirmed working on that
+  machine. Other sync commands have not been audited for the same pattern; anything that waits for
+  the event loop must be `async`.
+- **The main window may exist before `setup` has managed `Db` and `SecretStore`.** On the older
+  Windows machine the webview asked first: state-free commands answered, stateful ones failed
+  (`settings_all`, `secret_status`, `sessions_list`), and the UI then wrote its defaults over the
+  stored values. The 0.6.5 changes make the boot steps independent and stop a read failure from
+  looking like an empty database — the race itself is still there. The honest fix is to create the
+  main window inside `setup`, after `app.manage`, which means reworking the splash handover.
+- Windows and macOS builds are unsigned. The Windows build has now run on real hardware (0.6.4:
+  window, browser window, editor detection with zero editors); macOS still has not.
 - Sandbox-only code paths are now unreachable: `FLATPAK_ID` in `lib.rs`, `portal.rs` and
   `in_sandbox` in `capture.rs` exist for a package that is no longer built. Harmless, but dead —
   remove them when the next change touches capture or the data directory.

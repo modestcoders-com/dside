@@ -37,7 +37,7 @@ watch(
     void invoke("engine_clear_session_grants").catch(() => undefined);
   },
 );
-import { ensureWorkspace, reloadTree } from "./useWorkspace";
+import { ensureWorkspace, isAbsolutePath, reloadTree } from "./useWorkspace";
 import { buildPersona } from "../engine/persona";
 import { EVERYDAY_DISABLED_TOOLS, everydayMode } from "../engine/mode";
 import { partnerName, refreshPartnerName } from "../stores/partner";
@@ -342,29 +342,45 @@ let initializing: Promise<void> | null = null;
  * history. The chat panel mounts again after Settings; a second run would reload the stored
  * history and wipe live state such as a failed turn's retry bubble.
  */
+/**
+ * Runs one boot step on its own. On Windows the keyring read failed while the window was already
+ * up, and because every step was chained with `await`, one failure took the sessions, the file
+ * tree and the history with it — the app looked like a fresh installation. A step that fails now
+ * says so in the log and the rest still runs.
+ */
+async function bootStep(name: string, run: () => Promise<unknown>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    void invoke("log_message", { text: `init: ${name} failed: ${error}` }).catch(() => undefined);
+  }
+}
+
 export async function initEngine(): Promise<void> {
   if (initialized) return;
   if (initializing) return initializing;
   initializing = (async () => {
-    if (!unlisten) {
-      unlisten = await listen<EngineEvent>("engine://event", (event) => handleEvent(event.payload));
-    }
-    extractLegacyKey();
-    await ensureWorkspace();
-    await refreshSecret();
-    await refreshPartnerName();
+    await bootStep("events", async () => {
+      if (!unlisten) {
+        unlisten = await listen<EngineEvent>("engine://event", (event) => handleEvent(event.payload));
+      }
+    });
+    await bootStep("legacy key", () => Promise.resolve(extractLegacyKey()));
+    await bootStep("workspace", ensureWorkspace);
+    await bootStep("secret", refreshSecret);
+    await bootStep("partner name", refreshPartnerName);
     // Ask the provider which models exist before the first turn: an id it does not know would
     // fail every request, and the field would look fine while doing it.
-    await loadModels();
-    await loadSessions();
+    await bootStep("models", loadModels);
+    await bootStep("sessions", loadSessions);
     // The thread that was open decides the project before the engine is configured, so the
     // first request already carries the right folder.
-    adoptSessionWorkspace(activeSessionId.value);
-    await configureEngine();
+    await bootStep("session workspace", () => adoptSessionWorkspace(activeSessionId.value));
+    await bootStep("configuration", configureEngine);
     // Check the workspace at startup, not only when the file tab first mounts: the
     // composer's status line shows the difference between "empty" and "gone".
-    await reloadTree();
-    await loadHistory(activeSessionId.value);
+    await bootStep("file tree", reloadTree);
+    await bootStep("history", () => loadHistory(activeSessionId.value));
   })();
   try {
     await initializing;
@@ -514,7 +530,7 @@ export async function openSession(sessionId: string): Promise<void> {
   selectSession(sessionId);
   // Choosing a thread chooses its project. A global folder that disagrees with the
   // conversation on screen is the state this feature exists to remove.
-  if (adoptSessionWorkspace(sessionId)) await reloadTree();
+  if (await adoptSessionWorkspace(sessionId)) await reloadTree();
   await loadHistory(sessionId);
 }
 
@@ -526,10 +542,29 @@ export async function openSession(sessionId: string): Promise<void> {
  * alone: guessing one from the path would be a silent assumption, and the rail offers an
  * explicit "move into project" instead.
  */
-function adoptSessionWorkspace(sessionId: string): boolean {
+async function adoptSessionWorkspace(sessionId: string): Promise<boolean> {
   const session = sessions.value.find((entry) => entry.id === sessionId);
   const workspace = session?.workspace?.trim() ?? "";
-  if (!workspace || samePath(workspace, settings.workspace)) return false;
+  if (!workspace) return false;
+  // A stored relative path — the `"."` that older Windows installs wrote — names no folder.
+  // Adopting it undid the repair `ensureWorkspace` had just made: the title read `DS·IDE — .`,
+  // the tree and the tools went back to the start directory. The fault is repaired where it
+  // arose: the session is moved onto the folder that is actually in use.
+  if (!isAbsolutePath(workspace)) {
+    try {
+      await invoke("session_set_workspace", { id: sessionId, workspace: settings.workspace });
+      if (session) session.workspace = settings.workspace;
+      void invoke("log_message", {
+        text: `session ${sessionId}: replaced workspace "${workspace}" with "${settings.workspace}"`,
+      }).catch(() => undefined);
+    } catch (error) {
+      void invoke("log_message", {
+        text: `session ${sessionId}: could not repair workspace "${workspace}": ${error}`,
+      }).catch(() => undefined);
+    }
+    return false;
+  }
+  if (samePath(workspace, settings.workspace)) return false;
   settings.workspace = workspace;
   return true;
 }

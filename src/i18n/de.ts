@@ -473,6 +473,7 @@ export const de = {
       keepInBackgroundDesc:
         "Beim Schließen des Fensters bleibt DS·IDE im Tray und arbeitet weiter — nur so können eigene Erinnerungen fällen. „Beenden“ im Tray-Menü schließt die App.",
     },
+    unreadable: "Die gespeicherten Einstellungen konnten nicht gelesen werden. Änderungen in diesem Lauf werden nicht gespeichert — bitte die App neu starten.",
   },
   tray: {
     open: "Fenster öffnen",

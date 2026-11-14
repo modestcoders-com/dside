@@ -8,7 +8,7 @@ import { deepSeekMark } from "./deepseek-mark";
 import { t } from "../i18n";
 import { engineReady, saveApiKey } from "../composables/useEngine";
 import { ensureWorkspace, reloadTree } from "../composables/useWorkspace";
-import { firstRun, settings } from "../stores/settings";
+import { firstRun, flushSettings, settings } from "../stores/settings";
 import type { AppMode } from "../types";
 
 const selected = ref<AppMode>(settings.mode);
@@ -57,6 +57,9 @@ async function start(): Promise<void> {
     settings.mode = selected.value;
     settings.onboarded = true;
     firstRun.value = false;
+    // Written before the dialog goes away: what this decides is exactly what the *next* start
+    // reads, and a debounced write can be lost if the app is closed a moment later.
+    await flushSettings();
     void reloadTree();
   } catch (cause) {
     error.value = String(cause);
@@ -65,9 +68,10 @@ async function start(): Promise<void> {
   }
 }
 
-function later(): void {
+async function later(): Promise<void> {
   settings.onboarded = true;
   firstRun.value = false;
+  await flushSettings();
 }
 </script>
 

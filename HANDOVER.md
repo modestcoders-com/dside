@@ -6,12 +6,17 @@ log (German, one section per round); `AGENTS.md` describes how to work in the re
 **Repository:** https://github.com/modestcoders-com/dside (moved from `moc72/dside` on
 2026-10-26; the old path redirects).
 
-**Status:** `v0.6.0` is current. Since `v0.4.13` — the last release before the 0.5 line — the
-project gained a tool-result discipline (nothing may be reported without a tool result behind
-it), a verifier that answers fail-closed, self-reminders, paged history, the browser preview,
-projects with threads bound to their folders, and the official whale mark as an animated SVG.
+**Status:** `v0.6.4` is current (published 2026-11-14, 8 assets). Since `v0.4.13` — the last
+release before the 0.5 line — the project gained a tool-result discipline (nothing may be
+reported without a tool result behind it), a verifier that answers fail-closed, self-reminders,
+paged history, the browser preview, projects with threads bound to their folders, and the official
+whale mark as an animated SVG. The 0.6 line then fixed what daily use found: the shell's inverted
+`is_error` flag, the command scanner, the shared data directory, desktop categories, dead editor
+launchers, the context ring after a compression, and an AppImage that can update itself through a
+`.zsync` control file. The Flatpak was removed in 0.6.3 — built, working, never used.
 
-The five 0.5 releases were built and never published; `v0.6.0` carries their content.
+Work that exists only in the working tree, not in a commit, is listed in `WINDOWS-HANDOVER.md`;
+that file is also the briefing for a companion instance running on Windows.
 
 ## What it is
 
@@ -43,7 +48,7 @@ Checks and release:
 ```sh
 pnpm build                        # i18n check + vue-tsc + Vite
 pnpm check:i18n                   # six catalogs, same keys, no German leftovers
-cd src-tauri && cargo test --lib  # 63 passed, 13 ignored (live tests need DS_IDE_API_KEY)
+cd src-tauri && cargo test --lib  # 95 passed, 14 ignored (live tests need DS_IDE_API_KEY)
 pnpm tauri build                  # deb/rpm/AppImage, NSIS, dmg
 ```
 

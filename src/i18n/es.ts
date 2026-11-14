@@ -469,6 +469,7 @@ export const es: Messages = {
       keepInBackgroundDesc:
         "Al cerrar la ventana, DS·IDE permanece en la bandeja y sigue trabajando; así pueden dispararse sus recordatorios. «Salir» en el menú de la bandeja cierra la aplicación.",
     },
+    unreadable: "No se pudieron leer los ajustes guardados. Los cambios de esta sesión no se guardarán; reinicia la aplicación.",
   },
   tray: {
     open: "Abrir ventana",

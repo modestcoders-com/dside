@@ -15,7 +15,7 @@ import FirstRunDialog from "./components/FirstRunDialog.vue";
 import DeepSeekWhale from "./components/DeepSeekWhale.vue";
 import { deepSeekMark } from "./components/deepseek-mark";
 import { trackWindowTitle } from "./composables/useWindowTitle";
-import { firstRun } from "./stores/settings";
+import { firstRun, settingsUnreadable } from "./stores/settings";
 import { partnerDisplayName, partnerReveal, refreshPartnerName } from "./stores/partner";
 import Icon from "./components/Icon.vue";
 import { locale, t } from "./i18n";
@@ -248,6 +248,13 @@ function startDrag(which: "rail" | "work", event: PointerEvent) {
       </button>
     </div>
 
+    <!-- A read failure is not an empty database. Saying so is the difference between "something
+         is wrong" and "you are new here" — the second one invites redoing work that is not lost. -->
+    <div v-if="settingsUnreadable" class="read-banner" role="status">
+      <Icon name="x" :size="13" />
+      <span>{{ t("settings.unreadable") }}</span>
+    </div>
+
     <FirstRunDialog v-if="firstRun" />
     <SearchDialog v-if="searchOpen" />
     <WebDesignPanel />
@@ -278,6 +285,26 @@ function startDrag(which: "rail" | "work", event: PointerEvent) {
 .reveal-banner span {
   flex: 1;
   min-width: 0;
+}
+
+/* The same shape, but a warning colour and no dismiss button: this one is not an anecdote. */
+.read-banner {
+  position: fixed;
+  left: 50%;
+  top: 44px;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text);
+  font-size: 12px;
+  transform: translateX(-50%);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 45%);
 }
 
 .reveal-banner button {

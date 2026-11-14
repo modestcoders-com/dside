@@ -467,6 +467,7 @@ export const zhHans: Messages = {
       keepInBackgroundDesc:
         "关闭窗口后 DS·IDE 会留在托盘并继续工作——只有这样才能触发它自己的提醒。托盘菜单中的“退出”会关闭应用。",
     },
+    unreadable: "无法读取已保存的设置。本次运行的更改不会被保存，请重启应用。",
   },
   tray: {
     open: "打开窗口",

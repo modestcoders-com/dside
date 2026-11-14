@@ -1265,6 +1265,19 @@ fn show_main_window(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin: it decides whether this process is the one that keeps
+        // running. A second start brings the existing window forward instead of opening another
+        // copy — before this, every click on the icon added an instance, a tray icon and another
+        // writer on the same database.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            crate::log_line!("instance: second start, raising the existing window");
+            show_main_window(app);
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         // Size, position and maximised state of the main window survive a restart. Visibility
         // is deliberately left out: the splash decides when the main window appears, and a
@@ -1300,6 +1313,10 @@ pub fn run() {
         .manage(tray::TrayState::default())
         .setup(|app| {
             let directory = data_dir(app.handle())?;
+            // The first line of every start, and the only place that says where the data lives.
+            // "My settings are gone" cannot be answered without knowing which folder was read,
+            // and the path differs per platform and per installation (Flatpak, portable, dev).
+            crate::log_line!("data: {} ({})", directory.display(), std::env::consts::OS);
             let database = db::Db::open(&directory.join("ds-ide.sqlite3"))?;
             app.manage(database);
             app.manage(secret::SecretStore::new(directory.join("secrets.json")));

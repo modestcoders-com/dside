@@ -1,6 +1,6 @@
 [package]
 name = "DSIDE"
-version = "0.6.4"
+version = "0.6.5"
 license = "MIT"
 description = "An Agentic DeepSeek IDE"
 authors = ["Ziggy, Modest"]
@@ -24,6 +24,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-opener = "2"
 tauri-plugin-window-state = "2"
+# One running instance. Without it every click on the icon started another copy — seven of them
+# sat in the task bar at once, each with its own tray icon, all writing the same database.
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }

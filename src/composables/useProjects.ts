@@ -2,7 +2,7 @@ import { computed, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { settings } from "../stores/settings";
 import { activeSessionId, sessions } from "../stores/sessions";
-import { reloadTree } from "./useWorkspace";
+import { isAbsolutePath, reloadTree } from "./useWorkspace";
 import { createSession, openSession } from "./useEngine";
 import type { ProjectFolder } from "../lib/projects";
 import { isDirectChild, projectLabel, samePath } from "../lib/projects";
@@ -49,6 +49,10 @@ export const activeProject = computed(() => {
  */
 export async function activateProject(path: string): Promise<void> {
   const next = path.trim();
+  // A project is a folder that exists, and only an absolute path names one. Accepting `"."`
+  // put the app back into the directory it happened to be started from — the state a Windows
+  // install kept landing in, with the title reading `DS·IDE — .`.
+  if (!isAbsolutePath(next)) return;
   if (next === settings.workspace) return;
   settings.workspace = next;
   await reloadTree();
@@ -60,13 +64,17 @@ export async function activateProject(path: string): Promise<void> {
  * message wrote into projB — and a restart would silently undo whichever one lost.
  */
 export async function bindActiveThread(path: string): Promise<void> {
+  const next = path.trim();
+  // Same rule as above, and here it decides what a session stores: a relative path written into
+  // a thread would come back at the next start and push the app into the start directory again.
+  if (!isAbsolutePath(next)) return;
   const id = activeSessionId.value;
   const thread = sessions.value.find((entry) => entry.id === id);
-  if (thread && !samePath(thread.workspace || "", path)) {
-    await invoke("session_set_workspace", { id, workspace: path });
-    thread.workspace = path;
+  if (thread && !samePath(thread.workspace || "", next)) {
+    await invoke("session_set_workspace", { id, workspace: next });
+    thread.workspace = next;
   }
-  await activateProject(path);
+  await activateProject(next);
 }
 
 /**

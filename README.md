@@ -6,7 +6,8 @@ An agentic desktop IDE on **Tauri v2** (no Electron) with **DeepSeek** as the mo
 
 > The authoritative status, every design decision and the open list live in
 > [PROGRESS.md](./PROGRESS.md) — not in this file. What is still open lives in
-> [TODO.md](./TODO.md).
+> [TODO.md](./TODO.md). Taking the project over: [HANDOVER.md](./HANDOVER.md); the briefing for
+> running it on Windows: [WINDOWS-HANDOVER.md](./WINDOWS-HANDOVER.md).
 
 ![DS·IDE in Chinese: chat, work area with the README, and the file tree](docs/dside_050.webp)
 

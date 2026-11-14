@@ -472,6 +472,7 @@ export const en: Messages = {
       keepInBackgroundDesc:
         "Closing the window leaves DS·IDE in the tray and keeps working — that is what lets its own reminders fire. Quit in the tray menu closes the app.",
     },
+    unreadable: "The stored settings could not be read. Changes in this run will not be saved — please restart the app.",
   },
   tray: {
     open: "Open window",

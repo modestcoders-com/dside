@@ -471,6 +471,7 @@ export const fr: Messages = {
       keepInBackgroundDesc:
         "Fermer la fenêtre laisse DS·IDE dans la zone de notification et il continue de travailler — c'est ce qui permet à ses rappels de se déclencher. « Quitter » dans ce menu ferme l'application.",
     },
+    unreadable: "Les réglages enregistrés n'ont pas pu être lus. Les modifications de cette session ne seront pas enregistrées — veuillez redémarrer l'application.",
   },
   tray: {
     open: "Ouvrir la fenêtre",

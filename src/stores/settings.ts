@@ -154,15 +154,44 @@ export const firstRun = ref(false);
 
 let loaded = false;
 let timer: number | undefined;
+/** The stored settings could not be read. Different from "there are none". */
+export const settingsUnreadable = ref(false);
+
+/**
+ * What was last written successfully, so a flush writes only what changed. Without it every
+ * flush rewrote all twenty keys — and a flush on a window losing focus would be a write storm.
+ */
+const written: Record<string, string> = {};
 
 async function persistNow(): Promise<void> {
   for (const key of PERSISTED_KEYS) {
+    const value = JSON.stringify(settings[key]);
+    if (written[key] === value) continue;
     try {
-      await invoke("settings_set", { key, value: JSON.stringify(settings[key]) });
-    } catch {
-      // persistence is best effort; the app must keep working without it
+      await invoke("settings_set", { key, value });
+      written[key] = value;
+    } catch (error) {
+      // Not silent any more: a write that fails on one platform and not another is exactly the
+      // kind of thing nobody can investigate without a line in the log.
+      void invoke("log_message", { text: `settings: writing ${key} failed: ${error}` }).catch(
+        () => undefined,
+      );
     }
   }
+}
+
+/**
+ * Writes pending changes now instead of waiting for the debounce. Onboarding calls this: the
+ * first run decides what the next start sees, and 400 ms was long enough for a quick quit to
+ * lose it — which is one way "the dialog comes back every time" happens.
+ */
+export async function flushSettings(): Promise<void> {
+  if (!loaded) return;
+  if (timer) {
+    window.clearTimeout(timer);
+    timer = undefined;
+  }
+  await persistNow();
 }
 
 function schedulePersist(): void {
@@ -183,15 +212,51 @@ function apply(stored: Record<string, unknown>): void {
 }
 
 /**
+ * Reads the stored settings, retrying a few times.
+ *
+ * A single failed read used to be indistinguishable from an empty database, so the app showed
+ * the first-start dialog again on every start — even though the settings were there and an API
+ * key was remembered. That happened on Windows, where the boot read may arrive before the IPC
+ * channel is ready. Retrying costs a fraction of a second and removes the race; the distinction
+ * between "failed" and "empty" is what matters, because one of them must never look like the
+ * other.
+ */
+async function readStored(): Promise<Record<string, string> | null> {
+  let lastError = "";
+  // Twelve attempts, growing to half a second — about four seconds in total. The reason is not
+  // politeness: on an older Windows machine the webview called before the backend had managed its
+  // state, and one immediate failure was enough to turn the app into a fresh installation. A slow
+  // start must cost seconds, not the whole configuration.
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    try {
+      return await invoke<Record<string, string>>("settings_all");
+    } catch (error) {
+      lastError = String(error);
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, Math.min(500, 80 + attempt * 60)),
+      );
+    }
+  }
+  void invoke("log_message", {
+    text: `settings: could not be read after twelve attempts: ${lastError}`,
+  }).catch(() => undefined);
+  return null;
+}
+
+/**
  * Settings live in the SQLite `settings` table. Anything still sitting in localStorage
  * from earlier builds is imported once and then removed.
  */
 export async function initSettings(): Promise<void> {
-  let stored: Record<string, string> = {};
-  try {
-    stored = await invoke<Record<string, string>>("settings_all");
-  } catch {
-    stored = {};
+  const stored = await readStored();
+
+  // Unreadable is not empty. Showing "welcome, choose a folder and a key" over an existing
+  // installation hides the real problem and invites the user to redo work that is not lost.
+  // It also must not persist defaults: that would overwrite what is actually stored.
+  if (stored === null) {
+    settingsUnreadable.value = true;
+    firstRun.value = false;
+    return;
   }
 
   if (Object.keys(stored).length === 0) {
@@ -228,6 +293,15 @@ export async function initSettings(): Promise<void> {
   // ones from before this flag existed — never see the first-start dialog.
   firstRun.value = Object.keys(stored).length === 0;
   if (!firstRun.value) settings.onboarded = true;
+
+  // One line per start, and the only way to tell "the dialog thinks you are new" apart from
+  // "the table is really empty" on a machine I cannot look at. A report of "the dialog comes
+  // back every start" needs this number next to it.
+  void invoke("log_message", {
+    text:
+      `settings: read ${Object.keys(stored).length} keys, firstRun=${firstRun.value}, ` +
+      `appearance=${settings.appearance}, fontSize=${settings.fontSize}`,
+  }).catch(() => undefined);
 
   loaded = true;
   watch(settings, schedulePersist, { deep: true });
@@ -286,4 +360,16 @@ export function initReadingSize(): void {
 
 export function update<K extends keyof SettingsState>(key: K, value: SettingsState[K]): void {
   settings[key] = value;
+}
+
+/**
+ * A window that loses focus may be closed a moment later. The debounce is right while the user
+ * types; it is wrong as the last thing that happens before the process ends. Hiding is the common
+ * case (the tray keeps the app alive), quitting is the one that loses data.
+ */
+if (typeof window !== "undefined") {
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") void flushSettings();
+  });
+  window.addEventListener("pagehide", () => void flushSettings());
 }

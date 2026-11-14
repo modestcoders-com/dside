@@ -5415,3 +5415,118 @@ AppImage, das antwortet mit HTTP 200. Am CI-Paket selbst: `.upd_info` trägt den
 
 Mit dieser Runde ist der Test offen, den 0.6.3 nicht liefern konnte: ob Shelly aus der 0.6.3 auf
 0.6.4 aktualisiert — `shelly list-updates appimage` sollte 0.6.4 sehen.
+
+## 126. Windows: der Erste-Schritte-Dialog kommt bei jedem Start (2026-11-14)
+
+Gemeldet, und ausdrücklich als Windows-only benannt („hier funktioniert das Alles — nur in Windows
+nicht"): Bei jedem Start erscheint der Willkommens-Dialog mit Modus, Arbeitsverzeichnis und
+API-Key, obwohl Daten erhalten bleiben. Schriftgröße und Erscheinungsbild werden nicht übernommen.
+
+### Was das Muster verrät
+Genau **eine** Einstellung überlebt: der API-Key. Der liegt aber nicht in der `settings`-Tabelle,
+sondern im OS-Schlüsselbund (`secrets.json` als Rückfall). Die Tabelle selbst ist also entweder
+leer oder wird nicht gelesen — und das ist dieselbe Ursache wie „Erscheinungsbild kommt nicht
+zurück", weil beides aus derselben Tabelle stammt.
+
+### Was geändert wurde
+1. **Ein Lesefehler ist nicht eine leere Datenbank.** `initSettings` hat einen fehlgeschlagenen
+   Abruf wie „keine Einstellungen vorhanden" behandelt — und daraus folgt der Dialog. Jetzt gibt es
+   fünf Versuche mit kurzen Pausen, und ein endgültiger Fehler zeigt einen Hinweis statt des
+   Willkommensdialogs. Wichtig dabei: in diesem Fall wird **nichts** gespeichert, damit Vorgaben
+   nicht überschreiben, was tatsächlich in der Tabelle steht.
+2. **Onboarding schreibt sofort.** `flushSettings()` vor dem Schließen des Dialogs; 400 ms
+   Verzögerung waren lang genug, um bei einem schnellen Beenden verloren zu gehen.
+3. **Einstellungen werden beim Verstecken und beim Schließen geschrieben**, nicht erst nach 400 ms.
+4. **Kein stilles Scheitern mehr:** ein fehlgeschlagenes `settings_set` landet im Log, und jeder
+   Start schreibt eine Zeile mit der Zahl der gelesenen Schlüssel, `firstRun` und den geladenen
+   Werten für Erscheinungsbild und Schriftgröße.
+
+### Eine Instanz statt sieben
+Auf demselben Bildschirmfoto standen sieben DS·IDE-Symbole in der Taskleiste, jedes mit eigenem
+Tray-Icon, alle auf derselben Datenbank. Neu: `tauri-plugin-single-instance` als erstes Plugin —
+ein zweiter Start holt das vorhandene Fenster nach vorn und beendet sich.
+
+### Geprüft
+- zweiter Start: Prozesszahl bleibt **1**, im Log des ersten steht
+  `instance: second start, raising the existing window`
+- `settings_all` schreibt und liest zurück (`appearance`, `fontSize`)
+- Neustart: `theme=light`, `fontSize=19px`, kein Dialog, kein Hinweisbanner
+- Logzeile erscheint: `settings: read 32 keys, firstRun=false, appearance=dark, fontSize=13`
+- `cargo test --lib` 95 / 14 ignoriert, `vue-tsc` grün, i18n 525 Schlüssel
+
+**Nicht geprüft, und deshalb nicht „behoben":** ob das die Ursache auf Windows ist. Auf dieser
+Maschine war der Fehler nie zu sehen — die Änderungen schließen Lücken, die zu den Symptomen
+passen, und die neue Logzeile macht den nächsten Bericht auswertbar: steht dort
+`read 0 keys, firstRun=true`, ist die Tabelle wirklich leer (dann scheitern die Schreibvorgänge,
+und der Log nennt den Schlüssel); steht dort eine Zahl größer null, wird gelesen und der Dialog
+hat eine andere Ursache.
+
+### Eine Zeile, die den nächsten Bericht auswertbar macht
+Beim Start steht jetzt `data: <Pfad> (<OS>)` im Log — die einzige Stelle, die sagt, welcher Ordner
+gelesen wurde. „Meine Einstellungen sind weg" ist ohne diese Angabe nicht zu beantworten, weil der
+Pfad je nach Plattform und Installationsart anders lautet. Geprüft im Debug-Paket:
+`data: /tmp/ho49/data/com.deepvibe.ds-ide (linux)`, darunter wie erwartet
+`ui: settings: read 32 keys, firstRun=false, appearance=dark, fontSize=13`.
+
+Dazu `WINDOWS-HANDOVER.md`: das Übergabeprotokoll für die Instanz auf dem Windows-Rechner —
+getrennter Stand (Commit vs. Arbeitsbaum), was belegt ist und was vermutet, die vier Prüfungen mit
+den Logzeilen, wie man dort baut, und was zurückkommen soll. `HANDOVER.md` war auf dem Stand 0.6.0
+und nennt jetzt 0.6.4; README verweist auf beide.
+
+## 127. Mein Bruder hat auf Windows gemessen — und zwei Dinge besser gewusst (2026-11-14)
+
+Die Windows-Instanz hat ihren `PROGRESS.md` zurückgegeben. Er ist **neuer und länger** als dieser
+(5600 gegen 5474 Zeilen) und beschreibt Arbeit, die hier fehlt. Der wichtigste Punkt vorweg: **die
+Kopie, die hinüberging, war der veröffentlichte Stand 0.6.4, nicht der Arbeitsbaum.** Das steht
+dort selbst festgestellt: kein `.git`, `tauri-plugin-single-instance` fehlt in `Cargo.toml`,
+`flushSettings` und `settings: read` fehlen in `settings.ts`. Die Warnung im Übergabeprotokoll war
+also zutreffend — und die Prüfungen liefen am falschen Stand.
+
+### Was dort belegt wurde, und was es hier ändert
+- **Das Browserfenster funktioniert auf Windows.** In `v0.6.4` öffnet „Nutzung" ein zweites Fenster,
+  `platform.deepseek.com/usage` rendert vollständig, das X schließt es, der Hauptprozess läuft
+  weiter, und beide Logzeilen stehen da. **Die `async`-Änderung aus §125 ist damit auf Windows
+  bestätigt** — nicht mehr nur eine Schlussfolgerung.
+- **Die Einstellungen überleben keinen Neustart**, und die Ursache liegt *vor* dem Lesen: auf dem
+  älteren Rechner ruft die Webview, bevor `setup` die Zustände verwaltet hat. Zustandslose Befehle
+  (`default_workspace`, `detect_editors`, `set_project_title`) arbeiten, zustandsabhängige
+  (`settings_all`, `secret_status`, `sessions_list`) scheitern beim Start und funktionieren später
+  im selben Prozess. Weil die Oberfläche danach ihre Vorgaben schreibt, sind die gespeicherten Werte
+  weg. Das ist eine Hypothese mit Belegen — die Zeile, die sie abschließen würde, gab es in jenem
+  Stand nicht.
+- **Der Arbeitsordner fiel auf `.` zurück**, obwohl `ensureWorkspace` ihn geheilt hatte:
+  `adoptSessionWorkspace` übernahm den gespeicherten Sitzungsordner, und `"."` unterscheidet sich
+  von jedem absoluten Pfad. Dieselbe Lücke in `activateProject` und `bindActiveThread`.
+
+### Übernommen (Frontend, hier gebaut und geprüft)
+- `initEngine` läuft in **isolierten Schritten** (`bootStep`). Ein Fehlschlag beim Schlüsselbund
+  kostet nicht mehr Sitzungen, Baum und Verlauf; er steht als `ui: init: <Schritt> failed: …` im Log.
+- `adoptSessionWorkspace` übernimmt keinen relativen Pfad mehr, sondern **bindet die Sitzung auf den
+  reparierten Ordner um** (`session_set_workspace`) und protokolliert das.
+- `activateProject` und `bindActiveThread` weisen relative Pfade ab.
+- Der Leseversuch der Einstellungen ist von fünf auf **zwölf Versuche** gewachsen (~4 s), weil ein
+  alter Rechner länger brauchen darf als 600 ms.
+
+### Geprüft — den Windows-Zustand auf einer Kopie nachgestellt
+`settings.workspace = "."` und die aktive Sitzung ebenfalls `"."`, dann das gepackte Debug-Paket
+gestartet:
+- Logzeile `ui: session <id>: replaced workspace "." with "<home>"`
+- danach in der Datenbank: Einstellung **`<home>`**, Sitzung **`<home>`** — die Heilung hält
+- vorher (ohne die Änderung) blieb der Titel `DS·IDE — .` und beide Werte `"."`
+
+`cargo test --lib` 95 / 14 ignoriert, `vue-tsc` grün, i18n 525 Schlüssel, `check:private` sauber.
+
+### Nicht geprüft
+- Die isolierten Startschritte: der Fehlerfall ist auf dieser Maschine nicht herstellbar (die
+  Zustände sind immer verwaltet). Der Code kompiliert und läuft im Normalfall; dass er einen
+  Ausfall überlebt, ist plausibel, nicht gemessen.
+- Die eigentliche Ursache — Fenster zu früh da — ist damit **nicht** behoben, nur entschärft. Sauber
+  wäre, das Hauptfenster erst in `setup` zu erzeugen, nachdem `Db` und `SecretStore` verwaltet sind.
+  Das ist ein Umbau am Startpfad; er gehört nicht in eine Nacht ohne Windows-Rechner.
+
+### Zwei Kopien, zwei §126
+Beide Instanzen haben unabhängig einen Abschnitt `§126` geschrieben — hier über den
+Willkommensdialog, dort über den `.`-Rückfall. Dasselbe gilt für den `PROGRESS.md` selbst: die
+Dateien sind auseinandergelaufen. Wer sie zusammenführt, muss die Abschnitte umnummerieren; dieser
+Abschnitt ist der Versuch, den Stand der anderen Seite hier festzuhalten, ohne ihre Arbeit zu
+überschreiben.
