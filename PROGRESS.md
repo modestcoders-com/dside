@@ -5685,3 +5685,63 @@ Formulierungen oder i18n ist ein günstiges Modell brauchbar.
 ### Geprüft
 `check:private` sauber über alle fünf Seiten; TODO und README verweisen darauf. Kein Code
 angefasst, kein Paket gebaut.
+
+## 131. 0.6.6: Update-Hinweis, deutlicheres Abmelden, fünf Specs (2026-11-16)
+
+Veröffentlicht. Drei Dinge in dieser Runde:
+
+### Der Update-Hinweis
+Ein kleiner grüner Knopf in der Titelleiste, nur wenn es eine neuere Version gibt: „Update 0.6.5".
+Ein Klick öffnet die Release-Seite im Systembrowser. Die App installiert **nichts selbst** — eine
+laufende Anwendung, die ihren eigenen Installer startet und sich dabei ersetzt, bricht auf fremden
+Rechnern (UAC, gesperrte Dateien, halb ersetzte Installation).
+
+Die Abfrage läuft vier Sekunden nach dem Fenster, wird nie abgewartet, schweigt bei jedem Fehler
+und hält ihre Antwort sechs Stunden (GitHub erlaubt ohne Anmeldung 60 Abfragen pro Stunde).
+Versionen werden **numerisch** verglichen: `0.6.10` ist neuer als `0.6.9`; zwei Tests decken das
+ab, samt `v`-Präfix und Suffixen.
+
+### „Abmelden" sagt, was es tut
+Der Bestätigungsschritt hieß „Entfernen", obwohl er den API-Key löscht. Jetzt **„API-Key löschen"**
+in der Warnfarbe, mit einem Hinweis am Eintrag, wo der Schlüssel wieder hinkommt. Sechs Sprachen.
+
+### Fünf Specs
+`docs/specs/`: Plugins mit Code, MCP-Client, lesendes `bash` für den Verifier, ein Prüfer vor dem
+Release, und das Startrennen unter Windows. Beim Schreiben fiel die Entscheidung, die den Umfang
+halbiert: Ein Plugin mit Code und ein MCP-Server brauchen **denselben** Transport (JSON-RPC über
+stdio) — ein Plugin ist damit ein Manifest um einen Server, ein Text-Plugin braucht gar keinen
+neuen Codepfad. Eine Freigabe, ein Namensraum, eine Fehlerbehandlung.
+
+### Geprüft — und eine Entdeckung beim Prüfen
+Die Pakete wurden gebaut und **gestartet**, aber der übliche Weg ging nicht: die Einzelinstanz aus
+0.6.5 hält eine D-Bus-Sperre, und die gilt **prozessweit**, nicht pro Datenverzeichnis. Solange
+eine Instanz läuft, startet keine zweite — auch keine mit eigenem `XDG_DATA_HOME`; sie ordnet sich
+unter und beendet sich (exit 0, keine Ausgabe). Das ist genau das gewünschte Verhalten und macht
+den bisherigen Testaufbau („isoliertes Datenverzeichnis, zweite Instanz") unmöglich, solange die
+eigene App offen ist.
+
+Gelöst mit `dbus-run-session`: eine **eigene Sitzungs-Bus-Umgebung** hat ihre eigene Sperre, damit
+laufen Test und echte Instanz nebeneinander. Ergebnis am Release-Paket: `data: … (linux)`,
+`settings: read 32 keys, firstRun=false`, `startup: main window shown`, und beim Update-Check
+`update: 0.6.5 is the newest, nothing to do` — richtig, weil 0.6.6 noch nicht veröffentlicht war
+und 0.6.6 > 0.6.5 gilt. Die `.deb`-Binary ebenso.
+
+**Ein Nebenwirkungen, die ich verursacht habe und die hier stehen muss:** Für einen parallelen Test
+hatte ich vorübergehend die Bundle-Kennung auf `com.deepvibe.ds-ide.test` geändert. Der laufende
+`pnpm tauri dev` des Nutzers hat die Änderung bemerkt, neu gebaut und ist mit der Test-Kennung in
+einem eigenen Datenverzeichnis gestartet — die App sah also kurz wie eine frische Installation aus.
+Nach dem Zurücksetzen hat `tauri dev` erneut gebaut und läuft wieder auf der echten Kennung und der
+echten Datenbank (geprüft: offene DB ist `~/.local/share/com.deepvibe.ds-ide/ds-ide.sqlite3`).
+Lehre: Eine Änderung an `tauri.conf.json` stört einen laufenden Dev-Server, also nie währenddessen.
+
+Die Release-Pakete selbst tragen die echte Kennung (im Binary geprüft: kein `.test`).
+
+### Veröffentlicht
+`v0.6.6`, `latest`, 8 Assets (deb, rpm, AppImage, **AppImage.zsync**, linux-tar.gz, dmg,
+Windows-Zip, `.exe`). Alle vier CI-Jobs grün beim ersten Lauf. Am veröffentlichten Stand: die
+`.zsync` lädt mit HTTP 200 (310 630 bytes), ihr `URL`-Header zeigt auf das AppImage, das antwortet
+mit HTTP 200.
+
+Mit dieser Version hat die App ihren eigenen Update-Hinweis: die installierte 0.6.5 sollte beim
+nächsten Start **„Update 0.6.6"** in der Titelleiste zeigen — der erste echte Lauf dieser Funktion
+auf einem Schreibtisch, den ich nicht sehe.
