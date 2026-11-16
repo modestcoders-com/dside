@@ -70,6 +70,8 @@ export const zhHans: Messages = {
     learnMore: "了解更多",
     signIn: "登录",
     logout: "退出登录",
+    logoutConfirm: "删除 API 密钥",
+    logoutHint: "从系统钥匙串中删除 API 密钥。此后在“设置 → 账户与模型”中重新填写之前，助手无法回答。"
   },
   toolbar: {
     terminal: "终端",
@@ -613,6 +615,10 @@ export const zhHans: Messages = {
     absoluteOnly: "请填写完整路径，例如 C:\\Users\\Name 或 /home/name。"
   },
 
+  update: {
+    label: "更新 {version}",
+    hint: "版本 {version} 可用——当前为 {current}。在浏览器中打开发布页面，本系统的安装包就在那里。",
+  },
   about: {
     tagline: "一个本地智能开发环境，拥有自己的 AI 伴侣——为两个人而做。",
     authors: "作者",

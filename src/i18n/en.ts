@@ -71,6 +71,8 @@ export const en: Messages = {
     learnMore: "Learn More",
     signIn: "Sign in",
     logout: "Sign out",
+    logoutConfirm: "Delete API key",
+    logoutHint: "Removes the API key from the operating system’s keychain. Afterwards the companion cannot answer until you enter it again under Settings → Account & model."
   },
   toolbar: {
     terminal: "Terminal",
@@ -618,6 +620,10 @@ export const en: Messages = {
     absoluteOnly: "Please give a full path, e.g. C:\\Users\\Name or /home/name."
   },
 
+  update: {
+    label: "Update {version}",
+    hint: "Version {version} is available — you are on {current}. Opens the release page in your browser, where the installer for this system is.",
+  },
   about: {
     tagline: "A local agentic IDE with its own AI companion — built for two.",
     authors: "By",

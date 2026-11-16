@@ -482,10 +482,11 @@ function accountSettings() {
           class="menu-item"
           :class="{ danger: confirmSignOut }"
           type="button"
+          :title="t('account.logoutHint')"
           @click="signOut"
         >
           <Icon :name="confirmSignOut ? 'x' : 'external-link'" :size="14" />
-          <span>{{ confirmSignOut ? t("model.clear") : t("account.logout") }}</span>
+          <span>{{ confirmSignOut ? t("account.logoutConfirm") : t("account.logout") }}</span>
         </button>
         <button v-else class="menu-item accent" type="button" @click="signIn">
           <Icon name="sparkle" :size="14" /><span>{{ t("account.signIn") }}</span>

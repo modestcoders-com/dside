@@ -71,6 +71,9 @@
   --accent-contrast: #ffffff;
   --accent-whale: #0aaac2;
   --danger: #f14c4c;
+  /* "There is something newer": not a warning, so not red, and not the accent either —
+     the accent is what every ordinary control uses. */
+  --update: #3fb950;
 
   /* Message bubbles. Assistant and user get their own tone so the two sides of a
      conversation stay tellable apart, in both themes. */
@@ -119,6 +122,8 @@
   --accent-contrast: #ffffff;
   --accent-whale: #0aaac2;
   --danger: #c62828;
+  /* Darker than the dark-theme value: the same green is unreadable on white. */
+  --update: #1a7f37;
 
   --watermark: url("/deepseek-mark-blue.png");
 

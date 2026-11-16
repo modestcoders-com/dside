@@ -6,6 +6,7 @@ import { t } from "../i18n";
 import { activeSession, sessions } from "../stores/sessions";
 import { toggleRail } from "../stores/ui";
 import { openSession } from "../composables/useEngine";
+import { openUpdatePage, updateAvailable } from "../composables/useUpdateCheck";
 
 /**
  * The title is also the session switcher. The chevron used to be decoration: it promised a
@@ -26,6 +27,22 @@ async function pick(id: string): Promise<void> {
     <div class="side left">
       <button class="ghost" type="button" :title="t('nav.collapseSidebar')" @click="toggleRail">
         <Icon name="panel-left" :size="18" />
+      </button>
+      <!-- Only when there is something to get: a permanent "up to date" label is noise. -->
+      <button
+        v-if="updateAvailable"
+        class="update"
+        type="button"
+        :title="
+          t('update.hint', {
+            version: updateAvailable.latest,
+            current: updateAvailable.current,
+          })
+        "
+        @click="openUpdatePage"
+      >
+        <Icon name="arrow-up" :size="12" />
+        <span>{{ t("update.label", { version: updateAvailable.latest }) }}</span>
       </button>
     </div>
 
@@ -72,6 +89,27 @@ async function pick(id: string): Promise<void> {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Small and green, and only while there is something to get. */
+.update {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--update);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--update) 16%, transparent);
+  color: var(--update);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.update:hover {
+  background: color-mix(in srgb, var(--update) 28%, transparent);
 }
 
 .right {

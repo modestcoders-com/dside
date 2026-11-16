@@ -7,7 +7,8 @@ An agentic desktop IDE on **Tauri v2** (no Electron) with **DeepSeek** as the mo
 > The authoritative status, every design decision and the open list live in
 > [PROGRESS.md](./PROGRESS.md) — not in this file. What is still open lives in
 > [TODO.md](./TODO.md). Taking the project over: [HANDOVER.md](./HANDOVER.md); the briefing for
-> running it on Windows: [WINDOWS-HANDOVER.md](./WINDOWS-HANDOVER.md).
+> running it on Windows: [WINDOWS-HANDOVER.md](./WINDOWS-HANDOVER.md). Designs that are decided
+> but not built: [docs/specs](./docs/specs).
 
 ![DS·IDE in Chinese: chat, work area with the README, and the file tree](docs/dside_050.webp)
 
@@ -122,7 +123,8 @@ scripts/              small tools (e.g. the name-table importer)
 - The Git panel has no push or merge UI; it has branch switching and pull. The terminal has
   one shell per tab and no profile picker.
 - The published macOS DMG is **aarch64** (Apple Silicon); Intel needs another CI target or a universal build.
-- No signed installers, no notarization, no auto-updater. Windows SmartScreen and macOS Gatekeeper warn; the app is still installable.
+- No signed installers, no notarization, no self-installing updater. Windows SmartScreen and macOS Gatekeeper warn; the app is still installable. What does exist: the Linux AppImage updates itself through the `.zsync` control file shipped with each release (an updater such as Shelly performs it), and every build shows a small hint in the title bar when a newer release exists elsewhere — it opens the release page rather than installing anything.
+- One instance per desktop: starting it again brings the existing window forward instead of opening a second copy.
 - Windows is tested on Windows 11 and in CI. The macOS build is CI-only and has not been runtime-tested on a Mac.
 - No frontend E2E suite yet; CI runs the build and the Rust unit tests.
 

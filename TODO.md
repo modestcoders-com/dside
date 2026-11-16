@@ -43,59 +43,62 @@ this file is the list of what has not.
   with the release. Measured on a local 0.6.2 build: `.upd_info` carries
   `gh-releases-zsync|modestcoders-com|dside|latest|DS.IDE_*_amd64.AppImage.zsync`, the embedded
   `.desktop` carries `X-AppImage-Version=0.6.2`, and the control file has `Filename`, `MTime`,
-  `URL`, `SHA-1`. **Proven 2026-11-15:** Shelly reads the installed copy as `v0.6.2` and offers
-  `v0.6.5` — discovery works, i.e. version, pointer and comparison. **Still unproven:** that the
-  download and replacement actually succeed, which needs one click on that update.
+  `URL`, `SHA-1`. **Proven end to end 2026-11-15:** Shelly offered `v0.6.5` for an installed
+  `v0.6.2`, performed the update, and the result appeared in the menu marked as a new installation
+  under "Entwicklung".
+
+## Done in the 0.6.6 round (unreleased)
+
+- **"Sign out" says what it does.** The menu entry is called "Abmelden", but it deletes the API key;
+  the confirming step now reads "API-Key löschen" and the entry carries a hint saying where to put
+  the key back. Found on the first Windows run with 0.6.5 — as a joke, which was fair.
+
+- **An update hint inside the app.** `update_check` compares the running version with the newest
+  GitHub release (numerically — `0.6.10` beats `0.6.9`), the title bar shows a small green
+  "Update x.y.z" chip when there is something newer, and a click opens the release page in the
+  system browser. It never installs anything itself, never blocks the start, stays silent when
+  the check fails, and caches its answer for six hours. Proven in a packaged build with a
+  temporarily lowered version; the click itself was not triggered (it opens a browser).
 
 ## Wanted, needs a decision (not a defect)
 
-- **One instance with several windows** ("Window 1: <project>"), listed once in the task bar.
-  Today several instances are allowed and share one database — verified with five at once, the
-  history stayed intact. The title carries the project, which is what made them
-  indistinguishable before. Whether to refuse a second start, or to grow into one process with
-  several windows, is a product decision: the second is a multi-window architecture, the first
-  would fight the per-project workflow.
+- **Several windows in one process.** Since 0.6.5 a second start raises the existing window
+  instead of adding a copy — that is settled and confirmed on Windows. What is still open is the
+  other direction: *one* process that shows several windows, one per project, so the task bar
+  lists a single application. That is a multi-window architecture (shared state, one tray icon,
+  a window per project in the rail) and a product decision, not a defect.
 - **Absolute paths and the allowlist.** Refusing `Path::new`-style calls keeps the policy
   meaningful, but it also blocks an allowed tool that simply is not on PATH. Accepting an
   absolute path whose file name is allowed *and* which lies outside the workspace would fix the
   everyday case without letting the model point at something it wrote. Not decided.
 
-## Needs a spec first
+## Specs written, waiting for the go-ahead
 
-- **Selectable plugins — decided: plugins may carry code.** Not just text instructions. That
-  moves plugins into the same class as MCP servers: foreign code that acts on the user's machine,
-  so every call has to pass the permission model, and the trust question ("who wrote this, what
-  may it touch") has to be answerable in the panel. Open: where a plugin lives (app data vs.
-  folder named in settings), how enabling works per project, and whether the built-in skills
-  become plugins too — one mechanism instead of two. Needs a spec before code.
-- **MCP client — decided: same rules as `bash`.** The first use in a session is confirmed, later
-  calls in that session run without asking; in read-only mode no MCP tool is offered at all,
-  because nobody knows what it does. stdio first, HTTP/SSE later. Server output is foreign text
-  like a web page: it may inform, never instruct. Configuration is a JSON file the user writes —
-  no settings form for four fields.
-- **Verifier that may run `bash` in read-only mode — decided: yes.** A fixed list of read-only
-  programs (`git status/log/diff/show`, `grep`, `rg`, `ls`, `cat`, `head`, `tail`, `wc`, `diff`,
-  `stat`), no redirection, no writing flags; anything not classified does not run, and the
-  verifier then says it could not check instead of claiming it did. The point is not a sandbox
-  but a classification with a small, reviewable list.
-- **An independent reviewer before anything leaves the house.** The demand behind all three: more
-  room to decide, and a second look before a release. The honest shape is a *process* the
-  companion cannot skip, not a faculty it has: a fresh context that sees only the change, the
-  claim and the evidence (never the reasoning that produced them), which has to demand checkable
-  statements ("test X runs", "the package contains the category") and may not wave an unsupported
-  claim through. A verdict with an exit code in the release path — like `check-private.mjs` today.
-  It must be able to stop a release, not add a comment, and "undecided" has to block as well;
-  otherwise it becomes a rubber stamp. Deliberately **not** a second model: the same weights
-  produce the same plausible story, and a genuinely different faculty would live in the runtime,
-  not in an application. The independence here comes from *information* — what the reviewer is
-  not told — not from a different brain. Open: how its objection is recorded in the chronicle,
-  and whether it also gates destructive commands and deletions.
+Each one is a page in `docs/specs/`. The decisions are taken; what remains is the order.
 
-- **The context ring estimates instead of measuring when the loaded history is shorter than the
-  stored count.** `prompt_size` only trusts the provider's report while the number of loaded
-  messages matches it; orphaned tool results (dropped at load time) break that match. Comparing
-  `session_summaries.created_at` with `session_usage.updated_at` would separate "compressed" from
-  "a few rows skipped" and make the exact figure usable again. Cosmetic at a 1M context.
+- **Plugins that may carry code** — `docs/specs/plugins.md`. A plugin is a folder with a manifest,
+  optional notes and an optional program that speaks JSON-RPC over stdio — the same transport the
+  MCP client will use, so one permission gate covers both. Text-only plugins need no code path of
+  their own. Built-in skills stay built-in (decided). Disabling is immediate and leaves files on
+  disk. No store in the first version; when there is a reason, a single repository with a
+  `marketplace.json` and a SHA-256 per entry, which is what ZCode does.
+- **MCP client** — `docs/specs/mcp-client.md`. Tool names are `mcp__<server>__<tool>`: double
+  underscore so a name with a single one cannot be misread, and the `mcp__` prefix so an external
+  tool is distinguishable from a built-in one at a glance. Dashes and dots are normalised away —
+  readable for people, fragile for the tool-name grammars models are held to. stdio only;
+  configuration is a 0600 JSON file the user writes.
+- **Read-only `bash` for the verifier** — `docs/specs/verifier-readonly.md`. A fixed list of
+  programs, no redirection, a deny-list of flags (`-delete`, `-exec`, `git branch -D`, `--output`
+  …), workspace only. Anything unclassified does not run, and the verifier then reports that it
+  could not check instead of claiming it did.
+- **A reviewer before a release** — `docs/specs/release-reviewer.md`. Sees the diff, the claims and
+  the evidence, never the reasoning that produced them. Three verdicts, and `UNDECIDED` blocks.
+  Exit code in the release path. Our own model in a clean session, **not** a free-tier one: the
+  task is judging whether evidence supports a claim, and a weak model agrees with confident prose —
+  which is the failure being fixed.
+- **No window before the state it needs** — `docs/specs/startup-window.md`. An `app_ready` flag
+  plus a frontend gate closes the Windows race; creating the main window inside `setup` is the
+  thorough version and stays the second step, because it reworks four start-up paths at once.
 
 ## Known limits, not planned work
 

@@ -126,7 +126,8 @@ scripts/              小型工具（例如名称表导入工具）
 - **截图是真实的图像输入：** 经测试的 `deepseek-flash` 能读取其中的文字和布局。过小的图片会被拒绝；对视觉细节的精细判断仍受模型限制。在 macOS 上，需授予“屏幕录制”权限；在 Linux 上，则需安装 `grim`、`gnome-screenshot`、`spectacle`、`scrot` 或 `ImageMagick` 中的任一工具。
 - Git 面板暂不支持推送（push）或合并（merge）操作，仅支持分支切换和拉取（pull）。终端中每个标签页对应一个 Shell，且暂不支持配置方案（profile）选择。
 - 目前发布的 macOS DMG 安装包仅支持 **aarch64**（Apple Silicon 架构）；若要在 Intel 架构上运行，则需通过 CI 构建其他版本或通用版本（Universal Build）。
-- **暂无签名安装程序、未经过公证（notarization），也无自动更新功能。** Windows SmartScreen 和 macOS Gatekeeper 可能会弹出警告，但应用仍可正常安装。
+- **暂无签名安装程序、未经过公证（notarization），也不会自行安装更新。** Windows SmartScreen 和 macOS Gatekeeper 可能会弹出警告，但应用仍可正常安装。存在的是：Linux 上的 AppImage 借助随每次发布提供的 `.zsync` 控制文件自行更新（由 Shelly 这类更新器执行）；有新版本时，标题栏会显示一个小提示——它只打开发布页面，不会自行安装任何东西。
+- 每个桌面只运行一个实例：再次启动会把已打开的窗口带到前面，而不是打开第二个副本。
 - Windows 已在 Windows 11 和 CI 中测试；macOS 版本仅由 CI 构建，尚未在真实 Mac 硬件上测试。
 - 暂无前端端到端（E2E）测试套件；CI 负责执行构建及 Rust 单元测试。
 

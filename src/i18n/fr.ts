@@ -70,6 +70,8 @@ export const fr: Messages = {
     learnMore: "En savoir plus",
     signIn: "Se connecter",
     logout: "Se déconnecter",
+    logoutConfirm: "Supprimer la clé d’API",
+    logoutHint: "Supprime la clé d’API du trousseau du système. Ensuite, le compagnon ne peut plus répondre avant que tu la saisisses à nouveau dans Réglages → Compte et modèle."
   },
   toolbar: {
     terminal: "Terminal",
@@ -617,6 +619,10 @@ export const fr: Messages = {
     absoluteOnly: "Indique un chemin complet, par ex. C:\\Users\\Nom ou /home/nom."
   },
 
+  update: {
+    label: "Mettre à jour {version}",
+    hint: "La version {version} est disponible — tu es en {current}. Ouvre la page des versions dans le navigateur, où se trouve l’installeur pour ce système.",
+  },
   about: {
     tagline: "Un EDI agentique local avec son propre compagnon IA — conçu pour deux.",
     authors: "Par",

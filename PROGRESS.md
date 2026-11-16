@@ -5567,3 +5567,121 @@ Zeile vorher hatte die App in keinen Zweig gestellt — der Eintrag war da, nur 
 
 Zwei Beweise an einem Abend, beide für Fehler, die nur an einem Ort sichtbar waren: Shellys
 Update-Vorschlag (Datei, Zeiger, Vergleich) und der Menüzweig (Kategorie, Cache, Ordner).
+
+## 128. „Abmelden" sagt jetzt, was es tut (2026-11-15)
+
+Gefunden beim ersten Windows-Durchlauf mit 0.6.5, und als Scherz formuliert: „wir sollten vielleicht
+noch einen kleinen Hinweis schreiben, dass 'Abmelden' im Menü den API-Key löscht". Der Scherz war
+berechtigt — der Eintrag heißt „Abmelden", gelöscht wird aber ein Zugangsschlüssel, und der zweite
+Klick sagte nur „Entfernen".
+
+**Änderung:** zwei neue Texte in allen sechs Katalogen.
+- Der bestätigende Schritt heißt jetzt **„API-Key löschen"** (`account.logoutConfirm`) statt
+  „Entfernen" — genau dort passiert es.
+- Der Eintrag trägt einen Hinweis (`account.logoutHint`): entfernt den Schlüssel aus dem
+  Schlüsselbund des Betriebssystems, und ohne ihn kann der Begleiter nicht antworten, bis er unter
+  Einstellungen → Konto & Modell neu eingetragen ist.
+
+**Geprüft** im gepackten Debug-Build: Der Eintrag zeigt „Abmelden" mit dem Hinweis als Tooltip;
+nach einem Klick steht dort **„API-Key löschen"** in der Warnfarbe. Der zweite Klick wurde
+absichtlich **nicht** ausgelöst: `secret_clear` räumt den Eintrag im OS-Schlüsselbund auf, und der
+ist nicht auf das Test-Datenverzeichnis beschränkt — ein Test hätte den echten Schlüssel gelöscht.
+Stattdessen geprüft, dass er nach dem Abbruch noch da ist (`secret_status: present`).
+
+`vue-tsc` grün, i18n 527 Schlüssel. Kein Paket gebaut; die Runde sammelt.
+
+## 129. Ein Update-Hinweis in der App, und Shelly ist belegt (2026-11-15)
+
+Zwei Dinge aus demselben Bericht: Shellys Update-Kette ist vollständig belegt, und die App soll
+selbst merken, wenn es etwas Neueres gibt.
+
+### Shelly: die Kette ist ganz
+Das erste Bild zeigte „v0.6.2 — Update verfügbar: v0.6.5", das zweite DS·IDE im Menü mit dem
+Abzeichen **„Neu!"**. Damit ist nicht nur die Entdeckung belegt, sondern auch der Austausch: nach
+dem Update war die App neu installiert und wurde als Neuinstallation gekennzeichnet. Der Eintrag
+steht unter „Entwicklung", also greift auch die Kategorie.
+
+### Der Hinweis in der eigenen App
+Neu: `update_check` (Rust) fragt `releases/latest` bei GitHub, vergleicht numerisch mit der
+laufenden Version und liefert Version, Adresse und ein `available`-Flag. Die Oberfläche zeigt dann
+einen **kleinen grünen Knopf „Update 0.6.5"** links in der Titelleiste; ein Klick öffnet die
+Release-Seite im Systembrowser — dort liegt der Installer für das jeweilige System.
+
+Entscheidungen, die dahinterstehen:
+- **Kein Selbst-Installieren.** Eine laufende Anwendung, die ihren eigenen Installer startet und
+  sich dabei ersetzt, ist genau die Sorte Klugheit, die auf fremden Rechnern bricht. Der Hinweis
+  zeigt, wo es weitergeht.
+- **Nur wenn es etwas gibt.** Ein dauerhaftes „aktuell" wäre Lärm; das Abzeichen erscheint nur bei
+  einer neueren Version.
+- **Niemals im Startweg.** Die Abfrage läuft vier Sekunden nach dem Fenster und wird nicht
+  abgewartet. Antwortet GitHub nicht (Netz, Rate-Limit, Fehler), bleibt es still — kein Dialog,
+  kein Fehler, nur eine Logzeile `update: could not be checked`.
+- **Sechs Stunden Gedächtnis** im Backend, weil GitHub ohne Anmeldung nur 60 Abfragen pro Stunde
+  erlaubt.
+- Vergleich **numerisch**, nicht alphabetisch: `0.6.10` ist neuer als `0.6.9`. Zwei Unit-Tests
+  decken das ab, samt Tag-Präfixen (`v`) und Suffixen.
+
+### Geprüft — im gepackten Debug-Build
+- `update_check` gegen GitHub: `latest: 0.6.5`, `current: 0.6.5`, `available: false`, Logzeile
+  `update: 0.6.5 is the newest, nothing to do`
+- Mit vorübergehend auf 0.6.4 gesetzter Crate-Version (danach zurückgesetzt): der Knopf erscheint,
+  Text **„Update 0.6.5"**, Höhe 24 px, Farbe **rgb(63, 185, 80)** — grün, wie gewünscht; Tooltip
+  nennt beide Versionen
+- `cargo test --lib` **97** / 14 ignoriert (zwei neu), `vue-tsc` grün, i18n 529 Schlüssel,
+  `check:private` sauber
+
+**Nicht geprüft:** der Klick auf den Knopf. Er öffnet die Release-Seite im Systembrowser; das
+auszulösen hätte auf dem Schreibtisch ein Browserfenster geöffnet, während niemand da war. Der Weg
+ist `openUrl` aus dem Opener-Plugin, dieselbe Funktion, die schon „Feedback" und „Quelltext" nutzt.
+
+### Die Einzelinstanz, ausdrücklich
+Sie funktioniert auf Windows und ist dort bemerkt worden: ein zweiter Klick auf das Symbol holt das
+laufende Fenster nach vorn statt eine zweite Kopie zu starten. Vorher standen bis zu sieben
+Symbole in der Taskleiste.
+
+## 130. Fünf Specs geschrieben, entschieden statt gebaut (2026-11-16)
+
+Nachgefragt, was „Spec" hier eigentlich bedeutet, und ob die Liste noch stimmt. Zwei Dinge dazu:
+die Mehrfachinstanz-Zeile in `TODO.md` war veraltet (sie beschrieb noch „mehrere Instanzen sind
+erlaubt", obwohl 0.6.5 das Gegenteil macht), und die vier Specs waren zu jeweils einer Seite
+geworden. Beides nachgezogen.
+
+### Was ein Spec hier ist
+Eine Seite vor dem Code. Nicht Förmlichkeit: die Entscheidungen waren gefallen, die **Form** nicht,
+und die Form bestimmt die Schnittstellen. Ein Plugin-Format, das erst beim Programmieren entsteht,
+sitzt hinterher in Datenbank, Berechtigungsmodell und Oberfläche und wird dreimal geändert.
+
+### Die Entscheidungen des Nutzers, aufgenommen
+- **Plugins dürfen Code enthalten.** Eingebaute Skills bleiben eingebaut und werden **nicht** zu
+  Plugins — „die machen erst DS.IDE zu DS.IDE".
+- **Abwählen möglich, sofort wirksam**, Dateien bleiben liegen.
+- **Kein Store jetzt.** Ein Store für ausführbaren Code braucht Prüfung, Signatur und Rücknahme;
+  das ist eine Zusage, die man mit null Nutzern nicht ehrlich geben kann.
+- **MCP-Namen:** `mcp__<server>__<tool>` — doppelter Unterstrich, weil ein Name mit einfachem
+  Unterstrich sonst mehrdeutig wird; `mcp__`-Präfix, weil ein fremdes Werkzeug auf einen Blick von
+  einem eingebauten unterscheidbar sein muss. Strich und Punkt sind normalisiert weg.
+- **Verifier-Regel** wie beschrieben, jetzt niedergeschrieben.
+- **Release-Prüfer:** kein Free-Tier-Modell als Torwächter.
+
+### Der Punkt, der beim Schreiben aufgefallen ist
+Plugin und MCP-Server brauchen **denselben** Transport: JSON-RPC über stdio, `initialize` /
+`tools/list` / `tools/call`. Damit ist ein Plugin mit Code kein zweiter Mechanismus, sondern ein
+Manifest um einen Server — eine Freigabe, eine Fehlerbehandlung, ein Namensraum. Ein Plugin ohne
+`entry` ist reiner Text und braucht gar keinen neuen Codepfad. Das war die Entscheidung, die den
+Umfang halbiert.
+
+Ausdrücklich **nicht** JavaScript in der Webview als Plugin-Laufzeit: dort hängt das Tauri-IPC, ein
+Plugin könnte jeden `invoke` aufrufen, auch `settings_set`. Ein Unterprozess kann nur, was die
+Freigabe seinen Werkzeugaufrufen erlaubt.
+
+### Zum Release-Prüfer
+Gefragt wurde, ob wir nicht das Free-Tier von KiloCode als außenstehenden Prüfer nehmen. Dazu im
+Spec: **nein, nicht als Torwächter.** Die Aufgabe ist zu beurteilen, ob Belege eine Behauptung
+tragen — ein schwaches Modell stimmt überzeugender Prosa zu, und genau das ist der Fehler, der
+behoben werden soll. Die Unabhängigkeit kommt aus Information: unser eigenes Modell in einer
+frischen Sitzung, die nur Diff, Behauptungen und Belege sieht. Für einen ersten Durchgang über
+Formulierungen oder i18n ist ein günstiges Modell brauchbar.
+
+### Geprüft
+`check:private` sauber über alle fünf Seiten; TODO und README verweisen darauf. Kein Code
+angefasst, kein Paket gebaut.

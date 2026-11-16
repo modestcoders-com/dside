@@ -21,6 +21,7 @@ mod secret;
 mod skills;
 mod tray;
 mod test_bridge;
+mod update;
 
 // ---------------------------------------------------------------------------
 // Editor detection
@@ -1424,6 +1425,7 @@ pub fn run() {
             db::partner_name,
             db::partner_name_set,
             about_info,
+            update::update_check,
             diagnostics,
             db::default_display_name,
             db::memories_list,

@@ -71,6 +71,8 @@ export const es: Messages = {
     learnMore: "Más información",
     signIn: "Iniciar sesión",
     logout: "Cerrar sesión",
+    logoutConfirm: "Borrar la clave de API",
+    logoutHint: "Elimina la clave de API del llavero del sistema. Después el compañero no podrá responder hasta que la vuelvas a introducir en Ajustes → Cuenta y modelo."
   },
   toolbar: {
     terminal: "Terminal",
@@ -615,6 +617,10 @@ export const es: Messages = {
     absoluteOnly: "Indica una ruta completa, por ejemplo C:\\Users\\Nombre o /home/nombre."
   },
 
+  update: {
+    label: "Actualizar {version}",
+    hint: "La versión {version} está disponible; tienes la {current}. Abre la página de versiones en el navegador, donde está el instalador para este sistema.",
+  },
   about: {
     tagline: "Una IDE agéntica local con su propio compañero de IA: hecha para dos.",
     authors: "Por",

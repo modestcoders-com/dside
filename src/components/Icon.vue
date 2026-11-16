@@ -43,6 +43,8 @@ const shapes: Record<string, string[]> = {
   copy: ["M9 9h12v12H9z", "M5 15H3V3h12v2"],
   "arrow-left": ["M19 12H5", "M12 19l-7-7 7-7"],
   "arrow-right": ["M5 12h14", "M12 5l7 7-7 7"],
+  // Used by the update chip: a newer release is something to move up to, not to send.
+  "arrow-up": ["M12 19V5", "M5 12l7-7 7 7"],
   reload: ["M20 12a8 8 0 1 1-2.4-5.7", "M20 4v4h-4"],
   dots: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
   doc: ["M6 3h8l4 4v14H6z", "M14 3v4h4"],

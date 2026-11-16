@@ -70,6 +70,8 @@ export const de = {
     learnMore: "Mehr erfahren",
     signIn: "Anmelden",
     logout: "Abmelden",
+    logoutConfirm: "API-Key löschen",
+    logoutHint: "Entfernt den API-Key aus dem Schlüsselbund des Betriebssystems. Danach kann der Begleiter nicht mehr antworten, bis du ihn unter Einstellungen → Konto & Modell neu einträgst."
   },
   toolbar: {
     terminal: "Terminal",
@@ -619,6 +621,10 @@ export const de = {
     absoluteOnly: "Bitte einen vollständigen Pfad angeben, z. B. C:\\Benutzer\\Name oder /home/name."
   },
 
+  update: {
+    label: "Update {version}",
+    hint: "Version {version} ist verfügbar — du bist auf {current}. Öffnet die Release-Seite im Browser, wo der Installer für dieses System liegt.",
+  },
   about: {
     tagline: "Eine lokale agentische IDE mit einem eigenen KI-Begleiter — gebaut für zwei.",
     authors: "Von",

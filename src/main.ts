@@ -6,6 +6,7 @@ import { loadUiState } from "./lib/uiState";
 import { initWorkArea } from "./stores/workArea";
 import { initSessionSelection } from "./stores/sessions";
 import { initLastUsage } from "./composables/useEngine";
+import { checkForUpdate } from "./composables/useUpdateCheck";
 import { locale } from "./i18n";
 
 initTheme();
@@ -40,4 +41,7 @@ window.addEventListener("scroll", pinDocument, { passive: true });
 void boot().finally(() => {
   createApp(App).mount("#app");
   pinDocument();
+  // Deliberately after the window is up and not awaited: whether a newer release exists is
+  // worth knowing, but never worth a slower start. The backend keeps its answer for six hours.
+  window.setTimeout(() => void checkForUpdate(), 4000);
 });
