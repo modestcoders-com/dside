@@ -5998,3 +5998,12 @@ nach dem Neustart bei **78**. `update: 0.6.6 is the newest, nothing to do` — r
 nicht veröffentlicht war.
 
 `cargo test --lib` **110** / 14 ignoriert, `vue-tsc` grün, i18n 532 Schlüssel, `check:private` sauber.
+
+### Veröffentlicht
+`v0.6.7`, `latest`, 8 Assets (`.deb`, `.rpm`, AppImage, **AppImage.zsync**, linux-tar.gz, dmg,
+Windows-Zip, `.exe`). Alle fünf CI-Jobs (Prüfung, drei Plattformen, Anhängen) grün beim ersten
+Lauf. Am veröffentlichten Stand: die `.zsync` lädt mit HTTP 200 (310 644 Bytes), ihr `URL`-Header
+zeigt auf das AppImage, das mit HTTP 200 und 90 798 584 Bytes antwortet; `latest` ist `v0.6.7`.
+
+Mit dieser Version sollte die installierte 0.6.6 beim nächsten Start **„Update 0.6.7"** in der
+Titelleiste zeigen — und Shelly sollte das AppImage anbieten.
