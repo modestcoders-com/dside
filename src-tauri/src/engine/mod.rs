@@ -1247,7 +1247,8 @@ async fn screenshot_tool(app: &AppHandle, args: &Value) -> tools::ToolOutcome {
             Ok(shot) => {
                 let data = format!("data:{};base64,{}", shot.mime, shot.data_base64);
                 tools::ToolOutcome::ok(format!(
-                    "Screenshot of {id}: {} — the image follows in the next user message.",
+                    "Screenshot of {id}: {} — attached as the next message. If you cannot see it, \
+                     say so instead of describing the page.",
                     shot.note
                 ))
                 .with_image(data)
@@ -1259,7 +1260,8 @@ async fn screenshot_tool(app: &AppHandle, args: &Value) -> tools::ToolOutcome {
         Ok(shot) => {
             let data = format!("data:{};base64,{}", shot.mime, shot.data_base64);
             tools::ToolOutcome::ok(
-                "Screenshot of the whole desktop captured. The image follows in the next user message.",
+                "Screenshot of the whole desktop captured — attached as the next message. If you \
+                 cannot see it, say so instead of describing the screen.",
             )
             .with_image(data)
         }
@@ -1349,7 +1351,12 @@ async fn preview_tool(
                 // does come to rest, and that rest is what the boxes describe.
                 let started = std::time::Instant::now();
                 let mut previous: Option<Option<(u32, u32)>> = None;
-                for _ in 0..10 {
+                // Twenty readings, not ten: the call that *creates* the window has to wait for
+                // the webview to come up before it can take a new size at all, and that took
+                // longer than 1.2 s on the machine where this was reported. Breaking early on
+                // two identical readings keeps the usual case fast; the extra ceiling only
+                // costs anything when the window never settles — and then the note says so.
+                for _ in 0..20 {
                     tokio::time::sleep(std::time::Duration::from_millis(120)).await;
                     let Ok(next) = crate::browser::browser_read(app.clone(), Some(page.id.clone()))
                         .await
@@ -1378,6 +1385,43 @@ async fn preview_tool(
             if let Some(object) = value.as_object_mut() {
                 object.insert("preview".to_string(), serde_json::Value::String(url));
                 object.insert("size".to_string(), size);
+                // Did the page get everything it asked for? A built page with absolute asset
+                // paths renders empty and reports nothing — this is the only place that can
+                // see why, because it knows both the requested URLs and the served folder.
+                if let Some(root) = crate::preview::active_root(app) {
+                    let requested: Vec<String> = page
+                        .assets
+                        .iter()
+                        .map(|asset| asset.absolute_path.clone())
+                        .filter(|path| !path.is_empty())
+                        .collect();
+                    let missing = crate::preview::missing_assets(&root, &requested);
+                    if !requested.is_empty() {
+                        object.insert(
+                            "assets".to_string(),
+                            serde_json::json!({
+                                "requested": requested.len(),
+                                "missing": missing,
+                            }),
+                        );
+                    }
+                    if !missing.is_empty() {
+                        object.insert(
+                            "warning".to_string(),
+                            serde_json::Value::String(format!(
+                                "{} of {} assets could not be served: {}. The preview server is rooted \
+                                 at the workspace, so an absolute path like `/js/app.js` means a file \
+                                 at the workspace root — a built bundle usually sits deeper, e.g. \
+                                 `dist/js/app.js`. That is why the page can render empty without any \
+                                 error. Build it with a relative base (`base: \'./\'` in Vite) or \
+                                 open the file that references its assets relatively.",
+                                missing.len(),
+                                requested.len(),
+                                missing.join(", ")
+                            )),
+                        );
+                    }
+                }
                 object.insert(
                     "hint".to_string(),
                     serde_json::Value::String(
@@ -1396,6 +1440,18 @@ async fn preview_tool(
 
 /// Trims whitespace and the characters models use for emphasis: `**`, `__`, backticks and
 /// stray trailing punctuation. Both ends, because `**VERDICT: PASS**` puts one on each side.
+/// Appends the pictures a tool produced as one user message, after the tool results they belong
+/// to. The order is what the provider demands: the `tool_calls` block must be complete before
+/// another role follows, so a picture cannot be pushed while the block is still being filled.
+fn attach_tool_images(messages: &mut Vec<ChatMessage>, images: Vec<String>) {
+    if images.is_empty() {
+        return;
+    }
+    let mut message = ChatMessage::user("Screenshot of the current screen:");
+    message.image = Some(images);
+    messages.push(message);
+}
+
 fn strip_emphasis(value: &str) -> &str {
     value.trim().trim_matches(|c: char| {
         matches!(c, '*' | '_' | '`' | '~' | ' ' | '\t' | '.' | '!' | ':')
@@ -1505,20 +1561,68 @@ fn describe_size(
     }
 
     let mut clamped = Vec::new();
+    let mut limited = Vec::new();
+    let mut not_applied = Vec::new();
     if let Some((actual_width, actual_height)) = effective {
-        if width.is_some_and(|want| actual_width.abs_diff(want) > 1) {
-            clamped.push("width");
-        }
-        if height.is_some_and(|want| actual_height.abs_diff(want) > 1) {
-            clamped.push("height");
-        }
+        // Direction alone does not tell the cause. A requested 240 px comes back as 320 because
+        // that is the minimum — the result is *larger* than asked for. A requested 1280 px can
+        // also come back as 1920 when the window has not taken the new size yet. The minimum is
+        // the one fact that separates the two, so it is asked first.
+        let mut judge = |requested: Option<u32>, actual: u32, minimum: u32, axis: &'static str| {
+            let Some(want) = requested else { return };
+            if actual.abs_diff(want) <= 1 {
+                return;
+            }
+            if want < minimum && actual >= minimum {
+                clamped.push(axis);
+            } else if actual < want {
+                limited.push(axis);
+            } else {
+                not_applied.push(axis);
+            }
+        };
+        judge(width, actual_width, crate::browser::MIN_INNER_WIDTH, "width");
+        judge(height, actual_height, crate::browser::MIN_INNER_HEIGHT, "height");
     }
-    let note = if !settled {
-        "the webview did not settle before the measurement; the boxes may describe an earlier layout"
-    } else if !clamped.is_empty() {
-        "the requested size was clamped by the window's minimum size (320×280)"
+    let described = |axes: &[&'static str]| axes.join(" and ");
+    let note = if clamped.is_empty() && limited.is_empty() && not_applied.is_empty() {
+        if settled {
+            "measured at the requested size".to_string()
+        } else {
+            "the webview did not settle before the measurement; the boxes may describe an earlier \
+             layout"
+                .to_string()
+        }
+    } else if limited.is_empty() && not_applied.is_empty() {
+        format!(
+            "the window cannot get that small: {} was clamped by its minimum (320×280)",
+            described(&clamped)
+        )
+    } else if clamped.is_empty() && limited.is_empty() {
+        format!(
+            "the window had not taken the requested size when it was measured ({}): the reading \
+             describes the previous size. Ask again; the size from this call applies afterwards.",
+            described(&not_applied)
+        )
+    } else if clamped.is_empty() && not_applied.is_empty() {
+        format!(
+            "the window could not grow to the requested size: {} came back smaller. The screen or \
+             the window manager limits it.",
+            described(&limited)
+        )
     } else {
-        "measured at the requested size"
+        // More than one cause on more than one axis — name each with its axis.
+        let mut parts: Vec<String> = Vec::new();
+        if !clamped.is_empty() {
+            parts.push(format!("{} below the minimum", described(&clamped)));
+        }
+        if !limited.is_empty() {
+            parts.push(format!("{} came back smaller", described(&limited)));
+        }
+        if !not_applied.is_empty() {
+            parts.push(format!("{} not applied yet", described(&not_applied)));
+        }
+        format!("the measurement mixed causes: {}", parts.join("; "))
     };
     json!({
         "requested": { "width": width, "height": height },
@@ -1987,6 +2091,7 @@ async fn task_tool_with_snapshots(
         skills_root: crate::skills::skills_root(),
         command_policy: config.command_policy.clone(),
         allowed_commands: config.allowed_commands.clone(),
+        command_dirs: config.command_dirs.clone(),
         workspace_only: config.workspace_only,
     };
 
@@ -2136,6 +2241,7 @@ mod tests {
             permission: "full".to_string(),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
             browser_control: false,
             max_turns: 4,
@@ -2348,6 +2454,7 @@ mod tests {
             permission: "ask".to_string(),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
             browser_control: false,
             max_turns: 1,
@@ -2592,6 +2699,7 @@ async fn run_turn(
         skills_root: crate::skills::skills_root(),
         command_policy: config.command_policy.clone(),
         allowed_commands: config.allowed_commands.clone(),
+        command_dirs: config.command_dirs.clone(),
         workspace_only: config.workspace_only,
     };
     // The name can only be chosen once, so the tool disappears from the list afterwards —
@@ -2807,6 +2915,7 @@ async fn run_turn(
             return (seq, outcome_result);
         }
 
+        let mut pending_images: Vec<String> = Vec::new();
         for call in &outcome.tool_calls {
             if cancel.load(Ordering::SeqCst) {
                 break;
@@ -2891,7 +3000,10 @@ async fn run_turn(
                 let mut refusal: Option<String> = None;
                 if let Some(command) = command.as_deref() {
                     let approved = if config.permission == "read" {
-                        false
+                        // Plan mode means "only read". A command the classifier accepts is
+                        // exactly that, so the verifier keeps working there; anything else is
+                        // refused by the classifier, with its reason.
+                        true
                     } else if config.permission == "ask"
                         && !has_session_grant(app, session_id)
                         && !has_tool_grant(app, "verify")
@@ -2901,15 +3013,11 @@ async fn run_turn(
                         true
                     };
                     if !approved {
-                        refusal = Some(if config.permission == "read" {
-                            "verify: permission denied in Plan mode — a command cannot run there. \
-                             Ask the user to switch to Ask before changes or Full access."
-                                .to_string()
-                        } else {
+                        refusal = Some(
                             "verify: the user did not allow the command, so nothing was checked. \
                              Do not report the claim as verified."
-                                .to_string()
-                        });
+                                .to_string(),
+                        );
                     } else {
                         let ctx = tools::ToolContext {
                             workspace: PathBuf::from(&config.workspace),
@@ -2917,9 +3025,13 @@ async fn run_turn(
                             skills_root: crate::skills::skills_root(),
                             command_policy: config.command_policy.clone(),
                             allowed_commands: config.allowed_commands.clone(),
+                            command_dirs: config.command_dirs.clone(),
                             workspace_only: config.workspace_only,
                         };
-                        match tools::run_shell_command(command, &ctx, 300_000).await {
+                        // Read-only classification instead of the allowlist: the verifier may
+                        // read, never write, and a command that is not clearly read-only does
+                        // not run — it then reports that it could not check.
+                        match tools::run_readonly_command(command, &ctx, 300_000).await {
                             Ok((transcript, _failed)) => {
                                 evidence = Some(format!("$ {command}\n{transcript}"));
                             }
@@ -3120,6 +3232,7 @@ async fn run_turn(
                             skills_root: ctx.skills_root.clone(),
                             command_policy: ctx.command_policy.clone(),
                             allowed_commands: ctx.allowed_commands.clone(),
+                        command_dirs: ctx.command_dirs.clone(),
                             workspace_only: ctx.workspace_only,
                         };
                         tools::execute(&call.function.name, &arguments, &approved, &mut todos).await
@@ -3135,6 +3248,7 @@ async fn run_turn(
                         skills_root: ctx.skills_root.clone(),
                         command_policy: ctx.command_policy.clone(),
                         allowed_commands: ctx.allowed_commands.clone(),
+                        command_dirs: ctx.command_dirs.clone(),
                         workspace_only: ctx.workspace_only,
                     };
                     tools::execute(&call.function.name, &arguments, &approved, &mut todos).await
@@ -3207,16 +3321,23 @@ async fn run_turn(
             persist_turn(app, message_id, &said, tool_calls_json.as_deref(), &parts);
 
             messages.push(ChatMessage::tool(call.id.clone(), tool_outcome.content));
+            // The image must wait: a tool message may only be followed by the other tool results
+            // of the same call block. Pushing a user message with the picture here split the
+            // block whenever one assistant turn made several calls (preview + read + screenshot),
+            // and the provider rejected the whole request — so the companion was told "the image
+            // follows" and never saw it. Collected and appended after the loop instead.
             if let Some(image) = tool_outcome.image {
-                let mut screenshot = ChatMessage::user("Screenshot of the current screen:");
-                screenshot.image = Some(vec![image]);
-                messages.push(screenshot);
+                pending_images.push(image);
             }
             if question_expired {
                 // Remaining calls in this round are not run: the turn is over.
                 break;
             }
         }
+
+        // Every tool result of this assistant message has been appended; only now may a user
+        // message follow, and this is the one that carries the picture.
+        attach_tool_images(&mut messages, std::mem::take(&mut pending_images));
 
         // The question rang out. Say it plainly and stop — the conversation must not go on as
         // if a decision had been taken. Nothing before the question is lost.
@@ -3315,8 +3436,86 @@ mod estimate_tests {
         assert_eq!(exact["clamped"], json!([]));
         assert!(exact["note"].as_str().unwrap().contains("requested"));
 
+        // Unsettled *and* off the target: the more specific statement wins, because "did not
+        // settle" alone would hide that the reading is of the previous size.
         let unsettled = describe_size(Some(400), None, Some((1120, 840)), true, false);
-        assert!(unsettled["note"].as_str().unwrap().contains("settle"));
+        let note = unsettled["note"].as_str().unwrap();
+        assert!(note.contains("previous size"), "{note}");
+        assert!(!note.contains("minimum"), "1120 is larger than 400, not clamped: {note}");
+
+        // Unsettled with no size mismatch at all: only the layout warning applies.
+        let late = describe_size(Some(400), Some(700), Some((400, 700)), true, false);
+        assert!(late["note"].as_str().unwrap().contains("settle"));
+    }
+
+    /// The image a tool produced must arrive *after* every tool result of that call block. When
+    /// it was pushed inside the loop, a turn with several calls (preview + read + screenshot)
+    /// put a user message between two tool results — the provider rejects that, so the companion
+    /// was told "the image follows" and never saw it.
+    #[test]
+    fn a_tool_image_comes_after_all_tool_results() {
+        use crate::engine::types::{OutgoingFunction, OutgoingToolCall};
+
+        let calls = vec![
+            OutgoingToolCall {
+                id: "call-1".to_string(),
+                call_type: "function".to_string(),
+                function: OutgoingFunction {
+                    name: "preview".to_string(),
+                    arguments: "{}".to_string(),
+                },
+            },
+            OutgoingToolCall {
+                id: "call-2".to_string(),
+                call_type: "function".to_string(),
+                function: OutgoingFunction {
+                    name: "screenshot".to_string(),
+                    arguments: "{}".to_string(),
+                },
+            },
+        ];
+
+        let mut messages = vec![ChatMessage::user("look at the page")];
+        let mut assistant = ChatMessage::user("");
+        assistant.role = "assistant".to_string();
+        assistant.content = None;
+        assistant.tool_calls = Some(calls);
+        messages.push(assistant);
+        messages.push(ChatMessage::tool("call-1", "preview ok"));
+        messages.push(ChatMessage::tool("call-2", "screenshot captured"));
+        attach_tool_images(&mut messages, vec!["data:image/png;base64,AAAA".to_string()]);
+
+        // Every tool message must be contiguous and belong to the assistant before it.
+        let roles: Vec<&str> = messages.iter().map(|message| message.role.as_str()).collect();
+        assert_eq!(roles, vec!["user", "assistant", "tool", "tool", "user"]);
+        let last = messages.last().unwrap();
+        assert_eq!(last.image.as_ref().map(Vec::len), Some(1));
+
+        // And nothing is added when no picture was produced.
+        let before = messages.len();
+        attach_tool_images(&mut messages, Vec::new());
+        assert_eq!(messages.len(), before);
+    }
+
+    /// The case from the report: 1280×900 requested on the first call, 1920×974 measured, and
+    /// the answer blamed the minimum size (320×280) — which cannot be true, because the result
+    /// was larger than the request, not smaller.
+    #[test]
+    fn a_size_larger_than_requested_is_not_called_clamped() {
+        let first = describe_size(Some(1280), Some(900), Some((1920, 974)), true, true);
+        assert_eq!(first["clamped"], json!([]));
+        let note = first["note"].as_str().unwrap();
+        assert!(note.contains("previous size"), "{note}");
+        assert!(!note.contains("minimum"), "{note}");
+
+        // The real clamp: below the minimum, and the window cannot go smaller.
+        let small = describe_size(Some(240), Some(600), Some((320, 600)), true, true);
+        assert_eq!(small["clamped"], json!(["width"]));
+        assert!(small["note"].as_str().unwrap().contains("minimum"));
+
+        // A window that came back smaller than asked for is a third cause, not a clamp.
+        let limited = describe_size(Some(1200), Some(900), Some((1000, 900)), true, true);
+        assert!(limited["note"].as_str().unwrap().contains("smaller"));
     }
 
     /// "No width/height" must not look like "measured at the default"; the window keeps the

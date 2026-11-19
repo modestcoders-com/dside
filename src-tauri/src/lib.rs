@@ -1240,6 +1240,17 @@ fn splash_visible(app: AppHandle) {
     }
 }
 
+/// Set as the last statement of `setup`. The frontend waits for this before it calls anything
+/// that needs a database or the keyring, which removes the start-up race on slow machines.
+static READY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Deliberately takes no `tauri::State`: it has to answer at any moment, including before the
+/// state it would ask about exists.
+#[tauri::command]
+fn app_ready() -> bool {
+    READY.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 /// Called by the splash window once it has painted. Idempotent, so a late call is harmless.
 #[tauri::command]
 fn splash_ready(app: AppHandle) {
@@ -1367,6 +1378,13 @@ pub fn run() {
                 }
             });
 
+            // Everything `setup` has to manage is managed now. The flag is the one thing the
+            // frontend can ask before it touches `Db` or `SecretStore`: on an older Windows
+            // machine the webview asked first, state-free commands answered, stateful ones
+            // failed, and the app looked like a fresh installation.
+            READY.store(true, std::sync::atomic::Ordering::SeqCst);
+            crate::log_line!("startup: ready");
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1425,6 +1443,7 @@ pub fn run() {
             db::partner_name,
             db::partner_name_set,
             about_info,
+            app_ready,
             update::update_check,
             diagnostics,
             db::default_display_name,

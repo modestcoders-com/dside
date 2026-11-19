@@ -24,6 +24,11 @@ pub struct EngineConfig {
     pub command_policy: String,
     #[serde(default)]
     pub allowed_commands: Vec<String>,
+    /// Directories added to the companion's `PATH`, so a tool that is allowed by name but lives
+    /// outside `/usr/bin` — nvm, pyenv, rustup, Homebrew, Scoop — can still be called by name.
+    /// The allowlist stays "names only"; this only widens where a name is looked for.
+    #[serde(default)]
+    pub command_dirs: Vec<String>,
     /// Reject write/edit outside the workspace.
     #[serde(default)]
     pub workspace_only: bool,

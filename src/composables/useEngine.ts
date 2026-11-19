@@ -190,6 +190,7 @@ export async function configureEngine(): Promise<void> {
       permission: settings.permission,
       commandPolicy: settings.commandPolicy,
       allowedCommands: settings.allowedCommands,
+      commandDirs: settings.commandDirs,
       workspaceOnly: settings.workspaceOnly,
       browserControl: settings.browserControl,
       maxTurns: 24,
@@ -510,11 +511,26 @@ function hasSomethingToSay(row: DbHistoryRow): boolean {
  * existed only have the two separate fields, and they used to be shown as text-then-tools —
  * keeping that as the fallback means an old conversation still reads the way it did.
  */
+/**
+ * Older rows carry the fragments that the store used to write: one thinking block per switch
+ * between thinking and writing. Merging them here repairs every conversation that is already
+ * stored, without touching the database — the text is complete either way, it was only split.
+ */
+function mergeReasoning(parts: MessagePart[]): MessagePart[] {
+  const reasoning = parts.filter((part) => part.kind === "reasoning");
+  if (reasoning.length <= 1) return parts;
+  const merged: MessagePart = {
+    kind: "reasoning",
+    text: reasoning.map((part) => (part.kind === "reasoning" ? part.text : "")).join(""),
+  };
+  return [merged, ...parts.filter((part) => part.kind !== "reasoning")];
+}
+
 function timelineFor(row: DbHistoryRow, tools: ToolActivity[]): MessagePart[] {
   if (row.parts) {
     try {
       const parsed = JSON.parse(row.parts) as MessagePart[];
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) return mergeReasoning(parsed);
     } catch {
       // fall through to the rebuilt version
     }

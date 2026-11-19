@@ -47,7 +47,7 @@ this file is the list of what has not.
   `v0.6.2`, performed the update, and the result appeared in the menu marked as a new installation
   under "Entwicklung".
 
-## Done in the 0.6.6 round (unreleased)
+## Done in 0.6.6 (published 2026-11-16)
 
 - **"Sign out" says what it does.** The menu entry is called "Abmelden", but it deletes the API key;
   the confirming step now reads "API-Key löschen" and the entry carries a hint saying where to put
@@ -60,6 +60,23 @@ this file is the list of what has not.
   the check fails, and caches its answer for six hours. Proven in a packaged build with a
   temporarily lowered version; the click itself was not triggered (it opens a browser).
 
+- **Three findings from the IDE, all fixed.** `preview` now names the assets it could not serve
+  (a bundle with absolute paths renders empty and says nothing), the size note no longer blames the
+  minimum when the window simply had not taken the new size, and a screenshot's picture is attached
+  *after* all tool results of its block — it used to be pushed between them, which the provider
+  rejects, so the companion was told an image would follow and never saw one.
+
+- **Six findings from daily use, all addressed.** The chat no longer shatters into word
+  fragments with a "thinking" fold between each (a model that thinks in passes sends interleaved
+  deltas; reasoning is now one block at the top, and stored conversations are merged on load).
+  `PYTHONHOME`/`PYTHONPATH` pointing into a bundle are stripped from child processes like
+  `LD_LIBRARY_PATH` — though our own AppImage never set them. `2>&1` is a file descriptor, not a
+  file, so `cargo test 2>&1 | grep …` works now. `sed`, `awk`, `jq`, `test`, `cmp`, `xxd`,
+  `base64`, `sha256sum`, `md5sum` joined the default allowlist — and an untouched old list migrates
+  to it automatically, while a customised one is left alone. The `timeout_ms` ceiling went from ten
+  to thirty minutes, and the refusal message from five lines to two. `rm` and `cp` stay out of the
+  defaults on purpose: one deletes, the other overwrites; whoever needs them adds them in Policies.
+
 ## Wanted, needs a decision (not a defect)
 
 - **Several windows in one process.** Since 0.6.5 a second start raises the existing window
@@ -67,10 +84,27 @@ this file is the list of what has not.
   other direction: *one* process that shows several windows, one per project, so the task bar
   lists a single application. That is a multi-window architecture (shared state, one tray icon,
   a window per project in the rail) and a product decision, not a defect.
-- **Absolute paths and the allowlist.** Refusing `Path::new`-style calls keeps the policy
-  meaningful, but it also blocks an allowed tool that simply is not on PATH. Accepting an
-  absolute path whose file name is allowed *and* which lies outside the workspace would fix the
-  everyday case without letting the model point at something it wrote. Not decided.
+## Done in 0.6.7 (published 2026-11-19)
+
+- **Extra program folders (decision C).** The companion can be told where to look for a program
+  that is allowed by name but lives outside the system path — nvm, pyenv, rustup, Homebrew, Scoop.
+  One folder per line under Policies; the list is trimmed and de-duplicated as it is typed, because
+  an empty `PATH` segment means "the current directory" to a shell. The allowlist still decides
+  *what* may run; this only decides where a name is looked for.
+- **A missing program says why.** An allowed program that cannot be found now names itself and
+  points at that setting, instead of the shell's bare `command not found` — the rustup case:
+  allowed, installed, invisible.
+- **`app_ready`.** Set as the last statement of `setup`; the interface waits for it before touching
+  the database or the keyring, which closes the Windows start-up race. The retries stay, so a bug
+  in the flag cannot cost the configuration again.
+- **The verifier may read.** A fixed list of read-only programs, `git` limited to its reading
+  subcommands, a deny-list for flags that write (`-delete`, `-exec`, `--output`, `git branch -D` …).
+  Anything unclassified does not run, and the verifier then reports that it could not check. It
+  also runs in Plan mode now: reading is exactly what that mode permits.
+- **Two things the packaged run caught.** The new default list named `cmp` twice — one chip per
+  entry, so removing it would have removed both; now 79 entries, each once. And the list migration
+  ran before the watcher existed, so it was only written at the next unrelated change; it now
+  writes its result immediately, once.
 
 ## Specs written, waiting for the go-ahead
 
@@ -87,7 +121,7 @@ Each one is a page in `docs/specs/`. The decisions are taken; what remains is th
   tool is distinguishable from a built-in one at a glance. Dashes and dots are normalised away —
   readable for people, fragile for the tool-name grammars models are held to. stdio only;
   configuration is a 0600 JSON file the user writes.
-- **Read-only `bash` for the verifier** — `docs/specs/verifier-readonly.md`. A fixed list of
+- **Read-only `bash` for the verifier** — `docs/specs/verifier-readonly.md`. **Built.** A fixed list of
   programs, no redirection, a deny-list of flags (`-delete`, `-exec`, `git branch -D`, `--output`
   …), workspace only. Anything unclassified does not run, and the verifier then reports that it
   could not check instead of claiming it did.
@@ -96,7 +130,7 @@ Each one is a page in `docs/specs/`. The decisions are taken; what remains is th
   Exit code in the release path. Our own model in a clean session, **not** a free-tier one: the
   task is judging whether evidence supports a claim, and a weak model agrees with confident prose —
   which is the failure being fixed.
-- **No window before the state it needs** — `docs/specs/startup-window.md`. An `app_ready` flag
+- **No window before the state it needs** — `docs/specs/startup-window.md`. **First step built** (the flag); creating the window in `setup` is still open. An `app_ready` flag
   plus a frontend gate closes the Windows race; creating the main window inside `setup` is the
   thorough version and stays the second step, because it reworks four start-up paths at once.
 

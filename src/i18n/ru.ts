@@ -601,6 +601,9 @@ export const ru: Messages = {
     askTimeout: "Время на ответ",
     askTimeoutDesc: "Сколько вопрос или подтверждение ждёт ответа, прежде чем ход будет прерван.",
     minutes: "минут",
+    programDirs: "Дополнительные папки программ",
+    programDirsDesc: "Папки, в которых собеседник ищет программы вне системного пути — например, nvm, pyenv, rustup, Homebrew или Scoop. Одна папка на строку. Это меняет только место поиска по имени, а не список разрешённого.",
+    programDirsPlaceholder: "напр. ~/.local/bin\n~/.cargo/bin"
   },
 
   workspacePicker: {

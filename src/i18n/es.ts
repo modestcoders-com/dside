@@ -602,6 +602,9 @@ export const es: Messages = {
     askTimeout: "Tiempo de respuesta",
     askTimeoutDesc: "Cuánto espera una pregunta o una aprobación antes de que el turno se abandone.",
     minutes: "minutos",
+    programDirs: "Carpetas de programas adicionales",
+    programDirsDesc: "Carpetas donde el compañero busca programas que no están en la ruta del sistema — nvm, pyenv, rustup, Homebrew o Scoop, por ejemplo. Una carpeta por línea. Esto cambia dónde se busca un nombre, no qué está permitido.",
+    programDirsPlaceholder: "p. ej. ~/.local/bin\n~/.cargo/bin"
   },
 
   workspacePicker: {

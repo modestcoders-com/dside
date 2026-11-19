@@ -600,6 +600,9 @@ export const zhHans: Messages = {
     askTimeout: "回答时间",
     askTimeoutDesc: "提问或授权在回合放弃之前等待回答的时长。",
     minutes: "分钟",
+    programDirs: "附加程序文件夹",
+    programDirsDesc: "助手在系统路径之外查找程序的文件夹——例如 nvm、pyenv、rustup、Homebrew 或 Scoop。每行一个文件夹。这只改变按名称查找的位置，不改变允许哪些程序。",
+    programDirsPlaceholder: "例如 ~/.local/bin\n~/.cargo/bin"
   },
 
   workspacePicker: {

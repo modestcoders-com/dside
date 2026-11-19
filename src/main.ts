@@ -8,6 +8,7 @@ import { initSessionSelection } from "./stores/sessions";
 import { initLastUsage } from "./composables/useEngine";
 import { checkForUpdate } from "./composables/useUpdateCheck";
 import { locale } from "./i18n";
+import { waitUntilReady } from "./lib/ready";
 
 initTheme();
 initReadingSize();
@@ -16,6 +17,8 @@ document.documentElement.lang = locale.value;
 // Mount after settings and window state are loaded, so theme, language, the last session and
 // the last previewed file do not flash in one after the other.
 async function boot(): Promise<void> {
+  // Nothing that needs the database or the keyring before `setup` has provided them.
+  await waitUntilReady();
   await initSettings().catch(() => undefined);
   const ui = await loadUiState();
   initWorkArea(ui.workarea);

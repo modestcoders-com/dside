@@ -378,6 +378,7 @@ mod live {
             permission: "full".to_string(),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
             browser_control: false,
             max_turns: 2,

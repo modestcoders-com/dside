@@ -15,6 +15,9 @@ export interface SettingsState {
   /** Allowlist for the companion's bash tool; the user's own terminal is not affected. */
   commandPolicy: CommandPolicy;
   allowedCommands: string[];
+  /** Extra folders the companion's commands search, so a tool outside the system PATH is found
+   *  by its name. Empty by default: the allowlist still names programs, this only widens where. */
+  commandDirs: string[];
   /** Keep write/edit inside the workspace even in full access. */
   workspaceOnly: boolean;
   /** Let the work area follow files and pages the companion opens. */
@@ -60,7 +63,9 @@ export function defaultModelFor(mode: AppMode): string {
 
 /** The companion's default shell allowlist: build tools plus read-only shell commands.
  * It is a policy, not an OS sandbox; a path or a shell builtin can still do more. */
-export const defaultAllowedCommands = [
+/** The list shipped before the text tools were added — used only to recognise an untouched
+ *  list and move it forward. Kept verbatim; do not edit. */
+const PREVIOUS_DEFAULT_COMMANDS = [
   "pnpm", "npm", "npx", "yarn", "bun", "node", "deno",
   "cargo", "rustc", "rustup", "git",
   "python", "python3", "py", "pip", "pytest", "uv", "poetry",
@@ -71,6 +76,30 @@ export const defaultAllowedCommands = [
   "where", "which", "echo", "sort", "uniq", "wc", "diff", "cmp", "file", "stat",
   "du", "df", "tree", "uname", "ver", "whoami", "env", "printenv", "date", "sleep",
 ];
+
+export const defaultAllowedCommands = [
+  "pnpm", "npm", "npx", "yarn", "bun", "node", "deno",
+  "cargo", "rustc", "rustup", "git",
+  "python", "python3", "py", "pip", "pytest", "uv", "poetry",
+  "dotnet", "go", "java", "javac", "mvn", "gradle",
+  "make", "cmake", "gcc", "g++", "clang", "tsc", "tsx", "vite", "vitest",
+  "jest", "eslint", "prettier", "ruff", "black", "mypy", "sqlite3",
+  // Reading and shaping text. `sed`/`awk` are in every shell session; leaving them out made
+  // the companion rewrite commands into `python3 -c` one-liners, which is worse in every way.
+  // `cmp` already stands in the group below — the list is rendered one chip per entry, so a
+  // second mention would be a second chip with the same key.
+  "sed", "awk", "test", "jq", "xxd", "base64", "sha256sum", "md5sum",
+  "ls", "dir", "pwd", "cd", "cat", "type", "head", "tail", "grep", "rg", "find",
+  "where", "which", "echo", "sort", "uniq", "wc", "diff", "cmp", "file", "stat",
+  "du", "df", "tree", "uname", "ver", "whoami", "env", "printenv", "date", "sleep",
+];
+
+/** Order-insensitive comparison: a list is a set here. */
+function sameCommands(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const set = new Set(left);
+  return right.every((entry) => set.has(entry));
+}
 
 /** The API key is deliberately NOT here: it lives in the OS keyring (see secret.rs). */
 const PERSISTED_KEYS: (keyof SettingsState)[] = [
@@ -83,6 +112,7 @@ const PERSISTED_KEYS: (keyof SettingsState)[] = [
   "permission",
   "commandPolicy",
   "allowedCommands",
+  "commandDirs",
   "workspaceOnly",
   "followCompanion",
   "pinnedEditorId",
@@ -113,6 +143,7 @@ const defaults: SettingsState = {
   permission: "ask",
   commandPolicy: "allowlist",
   allowedCommands: [...defaultAllowedCommands],
+  commandDirs: [],
   workspaceOnly: true,
   followCompanion: true,
   pinnedEditorId: null,
@@ -289,6 +320,12 @@ export async function initSettings(): Promise<void> {
   apply(decoded);
   if (!("permission" in decoded)) settings.permission = permissionFromLegacy(decoded);
 
+  // An untouched list moves forward with the defaults. Recognising it by exact equality makes
+  // this self-limiting: as soon as anybody adds or removes a program the lists stop matching,
+  // and nothing is ever re-added behind their back.
+  const migrated = sameCommands(settings.allowedCommands, PREVIOUS_DEFAULT_COMMANDS);
+  if (migrated) settings.allowedCommands = [...defaultAllowedCommands];
+
   // A database with no settings rows is a fresh install. Existing installations — including
   // ones from before this flag existed — never see the first-start dialog.
   firstRun.value = Object.keys(stored).length === 0;
@@ -306,6 +343,11 @@ export async function initSettings(): Promise<void> {
   loaded = true;
   watch(settings, schedulePersist, { deep: true });
   watchModeModel();
+
+  // The migration above runs before the watcher exists, so nothing would write it out until the
+  // next unrelated change or the next time the window is hidden. Writing it now costs one line
+  // once: on the following start the stored list no longer matches the old one.
+  if (migrated) await persistNow();
 }
 
 /**

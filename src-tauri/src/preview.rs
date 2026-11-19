@@ -95,6 +95,45 @@ pub fn active_port(app: &AppHandle) -> Option<u16> {
 
 /// True when `url` points at the running preview server. Used to tell the companion's own
 /// page (clicking it is part of looking at it) from a page the user opened elsewhere.
+/// Assets the page asked for that the preview server cannot serve.
+///
+/// The case this exists for: a built page (Vue, React, plain webpack) references its bundle as
+/// `/js/app.js`. The server is rooted at the workspace, so that request means `<workspace>/js/app.js`
+/// — while the file lies in `<workspace>/dist/js/app.js`. The page then renders nothing, reports
+/// no error of its own, and looks exactly like a slow load. Naming the missing files turns that
+/// into a diagnosis.
+pub(crate) fn missing_assets(root: &Path, requested: &[String]) -> Vec<String> {
+    let mut missing = Vec::new();
+    for path in requested {
+        // Only paths the server would answer; a remote URL is not our business.
+        if !path.starts_with('/') {
+            continue;
+        }
+        let decoded = percent_decode(path.trim_start_matches('/'));
+        // `..` cannot be served anyway (see `resolve`), so it is reported the same way.
+        if decoded.split('/').any(|part| part == "..") {
+            missing.push(path.clone());
+            continue;
+        }
+        if !root.join(&decoded).is_file() {
+            missing.push(path.clone());
+        }
+    }
+    missing
+}
+
+/// The folder the preview server serves. The companion needs it to tell a missing asset from one
+/// that merely lives somewhere else.
+pub fn active_root(app: &AppHandle) -> Option<PathBuf> {
+    app.try_state::<PreviewState>().and_then(|state| {
+        state
+            .server
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|server| server.root.clone()))
+    })
+}
+
 pub fn is_preview_url(app: &AppHandle, url: &str) -> bool {
     let Some(port) = active_port(app) else {
         return false;
@@ -286,6 +325,37 @@ fn mime_for(path: &Path) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+
+    /// The case from the report: a Vue build references `/js/app.js`, the server is rooted at the
+    /// workspace and the file lies under `dist/`. The page renders empty and says nothing — this
+    /// is the function that names the missing files.
+    #[test]
+    fn assets_beyond_the_root_are_reported_as_missing() {
+        let workspace = std::env::temp_dir().join(format!("dside-preview-{}", std::process::id()));
+        let dist = workspace.join("dist").join("js");
+        std::fs::create_dir_all(&dist).expect("temp dirs");
+        std::fs::write(dist.join("app.js"), "console.log(1)").expect("write");
+        std::fs::write(workspace.join("index.html"), "<html></html>").expect("write");
+
+        let requested = vec![
+            "/js/app.js".to_string(),   // absolute path: served from the root, does not exist
+            "/index.html".to_string(),  // exists
+            "/dist/js/app.js".to_string(), // exists, just not where the page asks
+            "https://example.com/x.js".to_string(), // not ours
+        ];
+        let missing = missing_assets(&workspace, &requested);
+        assert_eq!(missing, vec!["/js/app.js".to_string()]);
+
+        let _ = std::fs::remove_dir_all(&workspace);
+    }
+
+    /// A path that climbs out cannot be served either, and must not be reported as present.
+    #[test]
+    fn a_path_with_parent_segments_counts_as_missing() {
+        let root = std::env::temp_dir();
+        let missing = missing_assets(&root, &["/../secrets".to_string()]);
+        assert_eq!(missing, vec!["/../secrets".to_string()]);
+    }
     use super::*;
 
     #[test]

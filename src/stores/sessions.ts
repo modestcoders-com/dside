@@ -69,6 +69,23 @@ export function beginAssistantMessage(): void {
  */
 function appendToPart(message: ChatMessage, kind: "text" | "reasoning", chunk: string): void {
   const parts = message.parts ?? (message.parts = []);
+
+  if (kind === "reasoning") {
+    // Thinking is one block, always at the top. A model that thinks in several passes sends
+    // its deltas interleaved with text — "text, reasoning, text, reasoning…" — and appending a
+    // new block per switch turned a single answer into confetti: three words of prose, a
+    // "thinking" fold, three more words, another fold. Found in a screenshot of a real answer.
+    const existing = parts.find((part) => part.kind === "reasoning");
+    if (existing) {
+      existing.text += chunk;
+      return;
+    }
+    parts.unshift({ kind: "reasoning", text: chunk });
+    return;
+  }
+
+  // Text does start a new block after a tool chip: what was said after a command belongs
+  // below it, not merged into the paragraph from before.
   const last = parts[parts.length - 1];
   if (last?.kind === kind) {
     last.text += chunk;

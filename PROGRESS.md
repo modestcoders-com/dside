@@ -5745,3 +5745,256 @@ mit HTTP 200.
 Mit dieser Version hat die App ihren eigenen Update-Hinweis: die installierte 0.6.5 sollte beim
 nächsten Start **„Update 0.6.6"** in der Titelleiste zeigen — der erste echte Lauf dieser Funktion
 auf einem Schreibtisch, den ich nicht sehe.
+
+## 132. C umgesetzt: zusätzliche Programmordner, Startbereitschaft, lesender Verifier (2026-11-17)
+
+Drei Dinge aus den Specs, alle noch uncommittet.
+
+### C: zusätzliche Programmordner
+Entschieden nach der Frage, was für den Begleiter hilfreicher ist. B (absolute Pfade zulassen)
+hätte das Modell Pfade raten lassen und eine Sicherheitszusage aufgeweicht; C lässt die Allowlist
+unangetastet und ändert nur, **wo** ein Name gesucht wird.
+
+- **Einstellung:** Richtlinien → „Zusätzliche Programmordner", ein Ordner pro Zeile. Beim Tippen
+  getrimmt, entdoppelt, abschließende Schrägstriche entfernt — ein leerer `PATH`-Abschnitt bedeutet
+  der Shell „das aktuelle Verzeichnis", und das ist genau die Sorte Unfall, die man nicht
+  versehentlich baut.
+- **Wirkung:** die Ordner stehen **vor** dem geerbten `PATH` im Kindprozess (`spawn_shell` →
+  `path_with`). Der Name bleibt das Einzige, was die Allowlist prüft.
+- **Die Meldung, wenn ein erlaubtes Programm fehlt:** statt eines nackten `command not found` sagt
+  der Werkzeugaufruf jetzt, welches Programm fehlt, dass es erlaubt ist und wo man den Ordner
+  einträgt — samt der bereits durchsuchten Zusatzordner. Das war der eigentliche Punkt aus dem
+  rustup-Fall: erlaubt, vorhanden, unsichtbar.
+
+Geprüft: 5 neue Tests (`missing_program` mit künstlichem Suchverzeichnis, Shell-Builtins nicht
+falsch gemeldet, `path_with`-Reihenfolge). Live im gepackten Build: Feld vorhanden, Eingabe
+`"/opt/tools\n\n  /opt/more  \n/opt/tools/"` wird zu `["/opt/tools","/opt/more"]` in der Datenbank.
+
+**Nicht geprüft:** dass ein Programm aus einem eingetragenen Ordner wirklich läuft. Dafür bräuchte
+es einen Modellaufruf (der `bash`-Werkzeugpfad hängt am Turn). Die Logik ist ein Test wert, den es
+gibt; der Ende-zu-Ende-Lauf fehlt.
+
+### Startbereitschaft (`startup-window`)
+`app_ready` ist ein zustandsloser Befehl, der als **letzte** Anweisung von `setup` auf wahr gesetzt
+wird. Die Oberfläche wartet davor (bis 10 s, dann Logzeile und weiter) — damit fragt niemand mehr
+nach der Datenbank, bevor es sie gibt. Die Wiederholversuche in `readStored` bleiben: das eine
+schließt die Lücke, das andere überlebt einen Fehler im Flag. Das Fenster-in-`setup` bleibt der
+zweite, gründlichere Schritt; nicht in dieser Runde.
+
+Geprüft: im gepackten Build steht `startup: ready` im Log, und `app_ready` liefert `true`.
+
+### Lesender Verifier (`verifier-readonly`)
+- `check_readonly` klassifiziert: feste Liste (`git`, `grep`, `rg`, `ls`, `find`, `cat`, `head`,
+  `tail`, `wc`, `diff`, `cmp`, `file`, `stat`, `du`, `tree`, `which`), für `git` nur die lesenden
+  Unterbefehle, `git branch` nur mit Listing-Flags, und eine Sperrliste für schreibende Flags
+  (`-delete`, `-exec`, `-execdir`, `-ok`, `-okdir`, `--output`, auch in der Form `--flag=wert`).
+- Umleitungen, Backticks und `$(...)` lehnt schon der vorhandene Scanner ab.
+- `run_readonly_command` klassifiziert zuerst und startet dann über **denselben** `spawn_shell` wie
+  `bash` — gleiche Umgebung, gleiche Zusatzordner, gleicher Timeout.
+- Der Verifier benutzt ihn jetzt statt `run_shell_command`. Und in **Planmodus** läuft er nun
+  (vorher wurde er dort pauschal abgelehnt): „nur lesen" ist genau das, was die Klassifikation
+  garantiert. Ein abgelehnter Befehl sagt, dass er nicht geprüft werden konnte.
+
+Geprüft: 2 neue Tests mit 12 erlaubten und 13 abgelehnten Befehlen, darunter `git branch -D`,
+`find -delete`, `git log --output=…`, `ls $(pwd)` und ein absoluter Pfad.
+
+### Was nicht in dieser Runde ist
+Plugins mit Code und der MCP-Client sind je ein eigener Subprozess-Lebenszyklus mit JSON-RPC; der
+Release-Prüfer ist ein eigenes Skript. Drei Specs, drei Runden — nicht als Anhang an einen Abend.
+
+`cargo test --lib` **103** / 14 ignoriert, `vue-tsc` grün, i18n 532 Schlüssel, `check:private` sauber.
+
+## 133. Drei Funde aus der IDE: schweigendes Preview, falsche Ursache, kein Bild (2026-11-17)
+
+Bericht aus dem laufenden Programm, alle drei nachgeprüft und behoben.
+
+### 1. `preview` verschwieg, warum nichts kam
+Eine gebaute Vue-Seite liefert `loading: true`, leeren Text, null Elemente. Ursache: das Bundle
+setzt `d.p="/"`, die Seite lädt `/js/app…`, der Preview-Server ist aber am **Workspace** verwurzelt
+— die Datei liegt unter `dist/js/…`. `loading: true` sieht dabei genauso aus wie eine langsame
+Seite; die Seite selbst meldet keinen Fehler.
+
+**Änderung:** Das Extraktions-Skript sammelt jetzt alle angeforderten Assets (`script[src]`,
+`link[rel=stylesheet]`, `img[src]`) samt aufgelöstem Pfad. `missing_assets` prüft jeden `/…`-Pfad
+gegen die tatsächlich bediente Wurzel. Das Preview-Ergebnis trägt `assets: {requested, missing}`
+und, wenn etwas fehlt, eine `warning`, die beides nennt: die fehlenden Dateien und den Grund
+(absolute Pfade landen am Workspace-Root) — samt Antwort darauf: relativer Base bauen
+(`base: './'`).
+
+Geprüft: Live im gepackten Debug-Build liefert `browser_read` für eine Seite mit `/js/app.js`
+genau dieses Asset mit `absolutePath: "/js/app.js"` bei `loading: true`; `missing_assets` hat zwei
+Tests (vorhanden, fehlt, fremde URL, `..`). **Nicht live geprüft:** die `warning` im
+Preview-Ergebnis — `preview` ist ein Modell-Werkzeug, kein Befehl, und ohne Modellaufruf nicht zu
+erreichen.
+
+### 2. Die Größenmeldung nannte die falsche Ursache
+Erster Aufruf mit 1280×900 → gemessen 1920×974, `clamped: ["width","height"]`, Begründung
+„clamped by the window's minimum size (320×280)". Das kann nicht stimmen: 1920 ist **größer** als
+1280.
+
+**Änderung:** Die Richtung allein unterscheidet die Ursachen nicht — 240 gewünscht wird zu 320
+(größer, weil das Minimum greift), 1280 gewünscht kann zu 1920 werden (größer, weil die neue Größe
+noch nicht angewandt ist). Deshalb fragt die Bewertung zuerst das Minimum (`MIN_INNER_WIDTH/HEIGHT`
+jetzt geteilt mit der Fenstererzeugung) und trennt drei Fälle: *unter dem Minimum geklemmt*,
+*größer als gewünscht — noch nicht übernommen*, *kleiner als gewünscht — Bildschirm/Fensterverwalter
+begrenzt*. Bei zwei Achsen mit zwei Ursachen nennt sie beide. Dazu wartet die Messung jetzt bis
+2,4 s statt 1,2 s, weil der Aufruf, der das Fenster **erzeugt**, länger braucht als ein späterer.
+
+Geprüft: neuer Test mit den Zahlen aus dem Bericht (1280×900 → 1920×974 heißt **nicht** geklemmt),
+plus die echten Klemme (240 → 320) und der dritte Fall (kleiner als gewünscht).
+
+### 3. Das Bild kam nie an — und wurde angekündigt
+Der Werkzeugtext sagte „the image follows in the next user message", und es kam keins.
+
+**Die Ursache, gefunden im Turn-Loop:** Das Bild wurde **innerhalb** der Schleife über die
+Werkzeugaufrufe als `user`-Nachricht angehängt. Machte eine Assistant-Nachricht mehrere Aufrufe
+(preview + browser_read + screenshot), landete die user-Nachricht **zwischen** zwei `tool`-Antworten.
+Der Anbieter verlangt, dass ein `tool_calls`-Block vollständig ist, bevor eine andere Rolle folgt —
+die Anfrage wurde also abgelehnt, und das Modell hat die Pixel nie gesehen. Dass es beim Einzelaufruf
+funktioniert, machte den Fehler so unauffällig.
+
+**Änderung:** Bilder werden gesammelt und **nach** der Schleife angehängt (`attach_tool_images`).
+Der Text sagt jetzt „attached as the next message. If you cannot see it, say so instead of
+describing the page" — eine Aufforderung, den Mangel zu melden, statt ihn zu übergehen.
+
+Geprüft: Test, der die Reihenfolge erzwingt (`user, assistant, tool, tool, user` mit Bild), und
+dass ohne Bild nichts angehängt wird. **Nicht live geprüft:** ein echter Modellaufruf mit Bild.
+
+`cargo test --lib` **107** / 14 ignoriert, `vue-tsc` grün, i18n 532 Schlüssel, `check:private` sauber.
+Kein Paket gebaut.
+
+## 134. Sechs Befunde aus dem Alltag: Fetzen im Chat, Python, Pipes (2026-11-18)
+
+Bericht aus einer anderen DS.IDE-Instanz, plus ein Bildschirmfoto desselben Problems, das hier
+nicht zu sehen war.
+
+### Das Wichtigste: der Chat zerfiel in Wortfetzen
+Auf dem Bildschirmfoto stand eine Antwort als Kette von Drei-Wort-Blöcken, dazwischen jeweils ein
+aufgeklappter DENKEN-Block: „die Ab" — DENKEN — „hilfe (" — DENKEN — „Pipe) und bietet". Die
+Antwort war nicht lesbar.
+
+**Ursache:** `appendToPart` legte einen neuen Block an, sobald die Art wechselte. Ein Modell, das
+in mehreren Anläufen denkt, schickt seine Deltas verschränkt — Text, Denken, Text, Denken. Jeder
+Wechsel wurde zu einem eigenen Block.
+
+**Änderung:** Denken ist **ein** Block, immer oben; neue Denk-Deltas hängen an den bestehenden.
+Text hängt weiterhin nur an den letzten Textblock — nach einem Werkzeug-Chip beginnt bewusst ein
+neuer, damit „das, was nach dem Befehl gesagt wurde" darunter steht und nicht im Absatz davor
+verschwindet.
+
+**Ältere Chats** tragen die Fetzen schon in der Datenbank. `mergeReasoning` führt sie beim Laden
+zusammen, ohne die Datenbank anzufassen — der Text war vollständig, nur zerschnitten.
+
+**Nicht live geprüft:** Die Darstellung selbst. Sie braucht einen Modellaufruf; die Logik ist zwei
+Funktionen und beim Laden zusätzlich rückwärts wirksam.
+
+### `PYTHONHOME`/`PYTHONPATH` aus dem Bundle
+Gemeldet: `python3 -c …` stirbt mit „Failed to import encodings module", weil `PYTHONHOME` in den
+AppImage-Mount zeigt; nur `python3 --version` geht.
+
+**Änderung:** `child_env` behandelt beide Variablen wie `LD_LIBRARY_PATH` — Einträge, die in den
+Bundle-Root zeigen, werden entfernt, eigene bleiben. Ein Test startet dafür eine echte Shell und
+liest, was sie sieht.
+
+**Aber:** **Unser** AppImage setzt die Variablen **nicht** (im AppRun, in den Hooks und im Binary
+gesucht: null Treffer). Der Befund stammt also von einer anderen Build-Version oder einem anderen
+Bundle. Die Änderung ist trotzdem richtig — sie ist die gleiche Klasse wie `LD_LIBRARY_PATH` und
+kostet nichts.
+
+### `2>&1` war eine Umleitung, `|` nicht
+`cargo test 2>&1 | grep "test result"` wurde abgelehnt, weil `2>&1` wie eine Datei-Umleitung
+aussah. Gemeint ist aber ein Filedescriptor — es wird nirgends etwas geschrieben. Damit war
+Ausgabefilterung unmöglich; ungefiltert kostet ein Testlauf 210 Zeilen statt 70 (Faktor 5,7, aus
+dem Bericht).
+
+**Änderung:** Der Scanner erlaubt `>&N`/`2>&1`-Formen. `> datei`, `2> datei`, `&> datei` und
+`< datei` bleiben abgelehnt — mit Test für beide Richtungen.
+
+### sed, awk, jq fehlten — und eine Migration für Bestandslisten
+Der Bericht nennt `sed`/`awk` als tägliche Reibung; Ersatz war `python3 -c`, was wieder an Punkt 1
+hing. `sed`, `awk`, `test`, `cmp`, `jq`, `xxd`, `base64`, `sha256sum`, `md5sum` stehen jetzt im
+Standard.
+
+**Und das reicht nicht:** Bestandsinstallationen tragen ihre gespeicherte Liste weiter. Deshalb
+erkennt `initSettings` eine **exakt unveränderte** alte Liste und zieht sie auf den neuen Standard
+nach. Sobald jemand ein Programm hinzufügt oder entfernt, greift die Migration nicht mehr — sie
+kann also nie eine eigene Anpassung überschreiben.
+
+Geprüft im gepackten Build: alte Liste (71) → **79** Einträge mit `sed`, `awk`, `jq`; danach `git`
+entfernt (78) → Neustart → **78**, `git` bleibt draußen.
+
+Beim ersten Release-Lauf aufgefallen und behoben: der neue Block nannte `cmp` zum zweiten Mal (die
+Liste hatte damit 80 Einträge, einer doppelt — die Richtlinien-Seite rendert einen Chip pro Eintrag,
+und ein doppelter Schlüssel hätte ein Entfernen doppelt gewirkt). Außerdem lief die Migration vor dem
+Watcher und wurde deshalb erst beim nächsten Schreibvorgang gespeichert; sie schreibt ihr Ergebnis
+jetzt sofort, einmalig.
+
+`rm` und `cp` sind **nicht** im Standard: `rm` ist destruktiv, `cp` überschreibt. Der Nutzer kann
+beide selbst in den Richtlinien eintragen — die Liste ist dafür da.
+
+### Zwei kleine Reibungen
+- **`timeout_ms`: Obergrenze 10 → 30 Minuten.** `cargo clippy --workspace --all-targets` brauchte
+  mehr als zehn und wurde abgeschnitten; die Beschreibung nennt jetzt Vorgabe und Grenze.
+- **Die Ablehnungsmeldung war fünf Zeilen lang** und stand bei jedem abgelehnten Aufruf. Jetzt zwei
+  Zeilen: Grund plus Verweis auf die Richtlinien.
+
+### Was nicht hierher gehört
+`ask_user` endet nach Ablauf bereits den Turn (seit 0.6.2) und `screenshot` schickt sein Bild seit
+gestern (als eigene Nachricht nach dem Block). Die nicht abgeräumte Todo-Liste ist Verhalten des
+Begleiters, nicht der App — dafür gibt es keinen Code-Fix.
+
+`cargo test --lib` **110** / 14 ignoriert, `vue-tsc` grün, i18n 532 Schlüssel, `check:private` sauber.
+Kein Paket gebaut, nichts committet.
+
+## 135. 0.6.7: Programmordner, Startbereitschaft, ein lesender Verifier (2026-11-19)
+
+Zwei Runden in einer Version: die Entscheidung zu den absoluten Pfaden (C) mit ihren drei
+Folgearbeiten, und die neun Funde aus dem Alltag, die danach kamen.
+
+### Wohin ein erlaubtes Programm gesucht wird (C)
+Die Allowlist entscheidet weiterhin, **was** laufen darf. Neu ist die zweite Frage: **wo** ein
+erlaubter Name gesucht wird. Unter Policies steht ein Feld „zusätzliche Programmordner", eine Zeile
+pro Ordner — nvm, pyenv, rustup, Homebrew, Scoop liegen alle außerhalb des Systempfads. Die Liste
+wird beim Tippen getrimmt und entdoppelt, weil ein leerer `PATH`-Eintrag für die Shell „das aktuelle
+Verzeichnis" bedeutet.
+
+Ein erlaubtes Programm, das trotzdem nicht gefunden wird, nennt sich jetzt selbst und verweist auf
+diese Einstellung, statt mit dem nackten `command not found` der Shell zu enden. Der rustup-Fall:
+erlaubt, installiert, unsichtbar.
+
+### Die Oberfläche wartet auf den Kern (`app_ready`)
+`READY` wird als letzte Anweisung von `setup` gesetzt; die Oberfläche fragt es beim Start ab
+(25-ms-Schritte, zehn Sekunden Geduld) und rührt erst dann Datenbank und Schlüsselbund an. Das
+schließt das Windows-Startrennen, bei dem das Fenster schneller war als der Zustand, den es liest.
+Die Wiederholungen aus 0.6.5 bleiben — ein Fehler im Flag darf die Konfiguration nicht erneut kosten.
+
+### Der Verifier darf lesen
+Eine feste Liste lesender Programme, `git` nur mit seinen lesenden Unterbefehlen, eine Sperrliste für
+schreibende Schalter (`-delete`, `-exec`, `--output`, `git branch -D` …). Was nicht eingeordnet ist,
+läuft nicht — und der Verifier meldet dann, dass er nicht prüfen konnte, statt zu behaupten, er habe
+geprüft. Im Plan-Modus läuft er jetzt ebenfalls: Lesen ist genau das, was dieser Modus erlaubt.
+
+### Neun Funde aus dem Alltag
+Drei aus einem Bericht der IDE (`preview` nannte die Assets nicht, die es nicht ausliefern konnte;
+die Größenangabe schob es auf das Minimum, obwohl das Fenster die neue Größe nur noch nicht hatte;
+ein Screenshot-Bild wurde zwischen die Werkzeugergebnisse geschoben, wo der Anbieter es ablehnt) und
+sechs aus dem täglichen Gebrauch: Chat-Fetzen, `PYTHONHOME`/`PYTHONPATH`, `2>&1`, `sed`/`awk`/`jq`,
+`timeout_ms` und die Ablehnungsmeldung. Einzelheiten in 133 und 134; die Textstellen sind dort
+bewusst unverändert.
+
+### Beim Release-Lauf gefunden
+Der Probelauf des Pakets hat zwei Dinge gezeigt, die vorher niemand gesehen hätte:
+
+- **`cmp` stand doppelt in der neuen Standardliste.** Die Richtlinien-Seite rendert einen Chip pro
+  Eintrag; mit doppeltem Namen hätte ein Entfernen doppelt gewirkt. Jetzt 79 Einträge, jeder einmal.
+- **Die Migration lief vor dem Watcher** und wurde deshalb erst beim nächsten Schreibvorgang
+  gespeichert. Sie schreibt ihr Ergebnis jetzt sofort — einmalig, denn beim nächsten Start passt die
+  Liste nicht mehr auf die alte.
+
+Belegt im gepackten Build (mit einer Kopie der echten Daten in einem eigenen Datenverzeichnis):
+`data: … (linux)`, `ui: settings: read 33 keys, firstRun=false`, `startup: main window shown`; alte
+Liste 71 → **79** gespeichert mit `sed`, `awk`, `jq`; eine angepasste Liste (78, ohne `git`) bleibt
+nach dem Neustart bei **78**. `update: 0.6.6 is the newest, nothing to do` — richtig, solange 0.6.7
+nicht veröffentlicht war.
+
+`cargo test --lib` **110** / 14 ignoriert, `vue-tsc` grün, i18n 532 Schlüssel, `check:private` sauber.

@@ -606,6 +606,9 @@ export const de = {
     askTimeout: "Antwortzeit",
     askTimeoutDesc: "Wie lange eine Rückfrage oder Freigabe auf eine Antwort wartet, bevor der Zug abbricht.",
     minutes: "Minuten",
+    programDirs: "Zusätzliche Programmordner",
+    programDirsDesc: "Ordner, in denen der Begleiter nach Programmen sucht, wenn sie nicht im System-Pfad liegen — etwa nvm, pyenv, rustup, Homebrew oder Scoop. Ein Ordner pro Zeile. Das ändert nur, wo ein Name gesucht wird, nicht was erlaubt ist.",
+    programDirsPlaceholder: "z. B. ~/.local/bin\n~/.cargo/bin"
   },
 
   workspacePicker: {

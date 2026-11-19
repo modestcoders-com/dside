@@ -4,6 +4,12 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 use tokio::time::sleep;
 
 const PREFIX: &str = "browser-";
+
+/// The browser window's minimum inner size. The engine needs the same numbers to explain a
+/// measurement honestly: a requested size below this comes back as this, which is a clamp —
+/// and a size above it that comes back different is something else entirely.
+pub(crate) const MIN_INNER_WIDTH: u32 = 320;
+pub(crate) const MIN_INNER_HEIGHT: u32 = 280;
 const MAX_WINDOWS: u32 = 6;
 
 fn parse(url: &str) -> Result<tauri::Url, String> {
@@ -101,7 +107,7 @@ pub async fn open_browser_window(
         .inner_size(1120.0, 840.0)
         // Low enough to measure a narrow breakpoint (the companion's preview can ask for
         // 400 px), high enough that the window still has usable chrome.
-        .min_inner_size(320.0, 280.0)
+        .min_inner_size(MIN_INNER_WIDTH as f64, MIN_INNER_HEIGHT as f64)
         // Following the companion must not take the keyboard away from the composer.
         .focused(raise_after)
         .build()
@@ -190,9 +196,30 @@ const READ_SCRIPT: &str = r##"
             : []
         };
       });
+    // Every asset the document asked for. A built page often references its bundle with an
+    // absolute path ("/js/app.js"); a preview server rooted at the workspace then serves a
+    // different file than the one on disk, and the page renders empty without any error the
+    // page itself can report. Knowing the requested URLs lets the host check them.
+    const assets = Array.from(document.querySelectorAll("script[src], link[rel=stylesheet][href], img[src]"))
+      .slice(0, 40)
+      .map((el) => ({
+        tag: el.tagName.toLowerCase(),
+        url: el.src || el.href || "",
+        absolutePath: (() => {
+          try {
+            const parsed = new URL(el.src || el.href || "", location.href);
+            return parsed.pathname;
+          } catch (_) {
+            return "";
+          }
+        })()
+      }))
+      .filter((asset) => asset.url);
+
     const data = {
       url: location.href,
       title: document.title,
+      assets,
       text: cap(document.body ? document.body.innerText : "", 8000),
       links,
       fields,
@@ -294,6 +321,22 @@ pub struct BrowserPage {
     /// handing back an empty document that looks like a result.
     #[serde(default)]
     pub loading: bool,
+    /// Scripts, stylesheets and images the document asked for, with the path each one resolves
+    /// to. A built page that references its bundle with `/js/app.js` requests a path the
+    /// preview server does not serve; without this list that failure is invisible.
+    #[serde(default)]
+    pub assets: Vec<BrowserAsset>,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize, Default)]
+pub struct BrowserAsset {
+    #[serde(default)]
+    pub tag: String,
+    #[serde(default)]
+    pub url: String,
+    /// The URL's path, i.e. what the server is asked for.
+    #[serde(default, rename = "absolutePath")]
+    pub absolute_path: String,
 }
 
 impl BrowserPage {
@@ -818,6 +861,7 @@ mod tests {
             fields: Vec::new(),
             layout: serde_json::json!({}),
             loading: false,
+            assets: Vec::new(),
         };
         assert!(page.looks_unloaded());
         page.title = "Example".to_string();

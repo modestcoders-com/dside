@@ -605,6 +605,9 @@ export const en: Messages = {
     askTimeout: "Answer time",
     askTimeoutDesc: "How long a question or an approval waits for an answer before the turn gives up.",
     minutes: "minutes",
+    programDirs: "Additional program folders",
+    programDirsDesc: "Folders the companion searches for programs that are not in the system path — nvm, pyenv, rustup, Homebrew or Scoop, for instance. One folder per line. This changes where a name is looked for, not what is allowed.",
+    programDirsPlaceholder: "e.g. ~/.local/bin\n~/.cargo/bin"
   },
 
   workspacePicker: {

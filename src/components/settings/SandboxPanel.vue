@@ -63,6 +63,23 @@ function resetCommands(): void {
   settings.allowedCommands = [...defaultAllowedCommands];
   cancelAdd();
 }
+
+/**
+ * One folder per line. Written back trimmed and de-duplicated, so a pasted block with blank
+ * lines does not end up in the `PATH` as empty entries — an empty `PATH` segment means "the
+ * current directory" to a shell, which is exactly the kind of accident worth preventing.
+ */
+function setDirs(value: string): void {
+  const seen = new Set<string>();
+  const dirs: string[] = [];
+  for (const line of value.split("\n")) {
+    const dir = line.trim().replace(/[\\/]+$/, "");
+    if (!dir || seen.has(dir)) continue;
+    seen.add(dir);
+    dirs.push(dir);
+  }
+  settings.commandDirs = dirs;
+}
 </script>
 
 <template>
@@ -127,6 +144,25 @@ function resetCommands(): void {
           {{ t("sandbox.invalidCommand") }}
         </p>
         <p class="hint">{{ t("sandbox.commandsHint") }}</p>
+      </div>
+
+      <!-- Where a name is looked for. The allowlist decides *which* programs exist for the
+           companion; this decides where a program's name is searched. A tool installed outside
+           the system PATH (nvm, pyenv, rustup, Homebrew, Scoop) would otherwise be allowed and
+           unreachable at the same time. -->
+      <div class="row stacked">
+        <div class="text">
+          <div class="label">{{ t("sandbox.programDirs") }}</div>
+          <div class="desc">{{ t("sandbox.programDirsDesc") }}</div>
+        </div>
+        <textarea
+          class="dirs"
+          rows="2"
+          spellcheck="false"
+          :value="settings.commandDirs.join('\n')"
+          :placeholder="t('sandbox.programDirsPlaceholder')"
+          @input="setDirs(($event.target as HTMLTextAreaElement).value)"
+        ></textarea>
       </div>
 
       <ToggleRow
@@ -326,6 +362,27 @@ function resetCommands(): void {
   flex: none;
   align-items: center;
   gap: 8px;
+}
+
+/* A list of folders is taller than one line, so this row stacks instead of sitting side by side. */
+.row.stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.dirs {
+  width: 100%;
+  min-height: 46px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.6;
+  resize: vertical;
 }
 
 .number {

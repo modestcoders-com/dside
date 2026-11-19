@@ -12,6 +12,9 @@ pub struct ToolContext {
     pub skills_root: PathBuf,
     pub command_policy: String,
     pub allowed_commands: Vec<String>,
+    /// Prepended to `PATH` for the commands the companion runs. Empty means "the inherited
+    /// PATH only", which is what every build did before this field existed.
+    pub command_dirs: Vec<String>,
     pub workspace_only: bool,
 }
 
@@ -127,7 +130,7 @@ pub fn definitions() -> Vec<Value> {
                     "type": "object",
                     "properties": {
                         "command": { "type": "string", "description": "Shell command to run." },
-                        "timeout_ms": { "type": "number", "description": "Timeout in milliseconds (default 120000)." }
+                        "timeout_ms": { "type": "number", "description": "Timeout in milliseconds. Default 120000 (2 min); the ceiling is 1800000 (30 min). A cold Rust build with all targets needs several minutes — name it instead of guessing low." }
                     },
                     "required": ["command"]
                 }
@@ -538,9 +541,33 @@ fn split_commands(command: &str) -> Option<Vec<String>> {
                         current.push(next);
                     }
                 }
-                '>' | '<' | '&' => {
-                    // `&&` separates; everything else here is a redirection or job control.
-                    if ch == '&' && chars.peek() == Some(&'&') {
+                '>' | '<' => {
+                    // `>&2` and `2>&1` name a file descriptor, not a file: no path is involved,
+                    // so nothing can be written anywhere. `>log` and `2>log` stay refused.
+                    let mut probe = chars.clone();
+                    let harmless = probe.peek() == Some(&'&')
+                        && probe.next().is_some()
+                        && matches!(probe.peek(), Some(&c) if c.is_ascii_digit() || c == '-');
+                    if harmless {
+                        current.push(ch);
+                        // Consume `&` and the descriptor number with it.
+                        let _ = chars.next();
+                        while let Some(next) = chars.peek().copied() {
+                            if next.is_ascii_digit() || next == '-' {
+                                current.push(next);
+                                chars.next();
+                            } else {
+                                break;
+                            }
+                        }
+                        continue;
+                    }
+                    return None;
+                }
+                '&' => {
+                    // `&&` separates; job control (`&`) and `&>file` do not belong in a policy
+                    // that has to be explainable.
+                    if chars.peek() == Some(&'&') {
                         chars.next();
                         segments.push(current.trim().to_string());
                         current.clear();
@@ -1224,6 +1251,89 @@ async fn code_review(args: &Value, ctx: &ToolContext) -> ToolOutcome {
     ToolOutcome::ok(truncate(body, MAX_OUTPUT_CHARS))
 }
 
+/// The `PATH` the companion's commands see: the user's extra directories first, then the
+/// inherited one. `None` when nothing was added — the child then keeps the inherited `PATH`.
+fn path_with(ctx: &ToolContext) -> Option<std::ffi::OsString> {
+    let extra: Vec<&str> = ctx
+        .command_dirs
+        .iter()
+        .map(|dir| dir.trim())
+        .filter(|dir| !dir.is_empty())
+        .collect();
+    if extra.is_empty() {
+        return None;
+    }
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    let mut parts: Vec<std::path::PathBuf> = extra.iter().map(std::path::PathBuf::from).collect();
+    parts.extend(std::env::split_paths(&inherited));
+    std::env::join_paths(parts).ok()
+}
+
+/// Commands the shell answers itself. They have no file to find, so "is it installed" must not
+/// be asked about them.
+const SHELL_BUILTINS: &[&str] = &[
+    "cd", "echo", "pwd", "type", "export", "set", "unset", "true", "false", "exit", "test",
+    "umask", "read", "shift", "wait", "kill", "trap", "alias", "hash", "printf", "source",
+];
+
+/// The directories a program name is looked in: the user's extras, then the inherited `PATH`.
+fn lookup_dirs(extra: &[String]) -> Vec<std::path::PathBuf> {
+    let mut dirs: Vec<std::path::PathBuf> = extra
+        .iter()
+        .map(|dir| dir.trim())
+        .filter(|dir| !dir.is_empty())
+        .map(std::path::PathBuf::from)
+        .collect();
+    if let Some(path) = std::env::var_os("PATH") {
+        dirs.extend(std::env::split_paths(&path));
+    }
+    dirs
+}
+
+/// True when `program` is a file in one of these directories. Split out from `on_path` so the
+/// rule is testable without touching the process environment (which is `unsafe` in Rust 2024
+/// and racy in a parallel test run).
+fn on_path_in(program: &str, dirs: &[std::path::PathBuf]) -> bool {
+    dirs.iter().any(|dir| {
+        let candidate = dir.join(program);
+        if candidate.is_file() {
+            return true;
+        }
+        // Windows: the executable is `cargo.exe` although the command says `cargo`.
+        candidate.with_extension("exe").is_file()
+    })
+}
+
+fn on_path(program: &str, extra: &[String]) -> bool {
+    on_path_in(program, &lookup_dirs(extra))
+}
+
+/// The first program a command line names that cannot be found. This turns the shell's bare
+/// `command not found` into advice — the rustup case needed exactly that: the program was
+/// allowed, it existed, and it was invisible because it was not on `PATH`.
+fn missing_program(command: &str, ctx: &ToolContext) -> Option<String> {
+    for segment in split_commands(command)? {
+        let mut words = segment.split_whitespace();
+        let mut program = words.next().unwrap_or("");
+        while program.contains('=') {
+            program = words.next().unwrap_or("");
+        }
+        let program = program
+            .trim_matches(|c| c == '"' || c == '\'')
+            .trim_end_matches(".exe");
+        if program.is_empty() || program.contains('/') || program.contains('\\') {
+            continue;
+        }
+        if SHELL_BUILTINS.contains(&program.to_lowercase().as_str()) {
+            continue;
+        }
+        if !on_path(program, &ctx.command_dirs) {
+            return Some(program.to_string());
+        }
+    }
+    None
+}
+
 /// Runs one shell command in the workspace and returns its transcript plus whether it failed.
 /// Shared by `bash` and by `verify`, so a command the verifier is given follows exactly the
 /// same rules as one the companion runs itself — including the policy check at the call site.
@@ -1237,16 +1347,155 @@ pub(crate) async fn run_shell_command(
 ) -> Result<(String, bool), String> {
     if ctx.command_policy.eq_ignore_ascii_case("allowlist") {
         if let Err(reason) = check_command(command, &ctx.allowed_commands) {
+            // Two lines, because this text is returned on every refused call — ten attempts
+            // used to cost fifty lines of the same paragraph.
             return Err(format!(
-                "refused by the command allowlist, not by the permission level: {reason}. \
-                 Full access decides whether a command may run without asking; the allowlist \
-                 decides which programs exist for the companion at all. The list is in \
-                 Settings → Policies; the tool `grep` and `glob` need no shell and are \
-                 unaffected."
+                "refused by the allowlist (Settings → Policies), not by the permission level: \
+                 {reason}. `grep` and `glob` need no shell."
             ));
         }
     }
 
+    // Allowed but invisible: the shell would answer "command not found" without saying why.
+    if let Some(program) = missing_program(command, ctx) {
+        let extra = ctx
+            .command_dirs
+            .iter()
+            .map(|dir| dir.trim())
+            .filter(|dir| !dir.is_empty())
+            .collect::<Vec<_>>();
+        return Err(format!(
+            "`{program}` is allowed, but it is not where the companion looks for programs{}. \
+             Add the folder that contains it in Settings → Policies → zusätzliche \
+             Programmordner (one folder per line); that changes where a name is searched, not \
+             what is allowed. Until then, call it by its full path in the terminal — the \
+             companion cannot use paths.",
+            if extra.is_empty() {
+                String::new()
+            } else {
+                format!(" (it searches: {} and the system PATH)", extra.join(", "))
+            }
+        ));
+    }
+
+    spawn_shell(command, ctx, timeout_ms).await
+}
+
+/// Programs the verifier may run. Read effect only, nothing that can write as a side effect.
+/// The list is deliberately short and reviewable: this is a claim about twenty names, not a
+/// claim about a sandbox.
+const READONLY_PROGRAMS: &[&str] = &[
+    // git, restricted to the read-only subcommands below
+    "git", "grep", "rg", "ls", "find", "cat", "head", "tail", "wc", "diff", "cmp", "file",
+    "stat", "du", "tree", "which",
+];
+
+/// Flags that write although their program looks harmless. `find -delete` and `git branch -D`
+/// are the two that matter, and they are exactly the kind of thing an unclassified list misses.
+const WRITING_FLAGS: &[&str] = &["-delete", "-exec", "-execdir", "-ok", "-okdir", "--output"];
+
+/// The `git` subcommands that only read. `branch` is allowed bare or with listing flags, because
+/// `git branch -D` is one keystroke away from `git branch`.
+const GIT_READONLY: &[&str] = &["status", "log", "show", "diff", "rev-parse", "ls-files", "blame"];
+
+/// Would this change anything? The verifier's rule: if the answer is not a clear "no", it does not
+/// run — and then the verifier says it could not check, rather than claiming it did.
+pub(crate) fn check_readonly(command: &str) -> Result<(), String> {
+    let Some(segments) = split_commands(command) else {
+        return Err(
+            "the command uses a feature this rule cannot analyse: a redirection, a backtick or \
+             $(...). The verifier may read; it may not write, and it may not hide what it does."
+                .to_string(),
+        );
+    };
+    for segment in segments {
+        if segment.trim().is_empty() {
+            continue;
+        }
+        let words: Vec<&str> = segment.split_whitespace().collect();
+        let mut index = 0;
+        // Leading `FOO=bar` assignments are data for the program, not a program.
+        while index < words.len() && words[index].contains('=') {
+            index += 1;
+        }
+        let Some(raw_program) = words.get(index) else {
+            return Err("the command names no program".to_string());
+        };
+        let program = raw_program
+            .trim_matches(|c| c == '"' || c == '\'')
+            .trim_end_matches(".exe")
+            .to_lowercase();
+        if program.contains('/') || program.contains('\\') {
+            return Err(format!(
+                "`{program}` is a path; the verifier names programs, not files"
+            ));
+        }
+        if !READONLY_PROGRAMS.contains(&program.as_str()) {
+            return Err(format!(
+                "`{program}` is not on the read-only list — the verifier may read, not change. \
+                 If the claim needs a command that writes, it cannot be checked here: say so \
+                 instead of reporting the claim as verified."
+            ));
+        }
+        let args = &words[index + 1..];
+        for argument in args {
+            let lowered = argument.to_lowercase();
+            // `--output=file` carries its value in the same word, so an exact match is not enough.
+            let writes = WRITING_FLAGS
+                .iter()
+                .any(|flag| lowered == *flag || lowered.starts_with(&format!("{flag}=")));
+            if writes {
+                return Err(format!(
+                    "`{program} {argument}` writes; the verifier may only read"
+                ));
+            }
+        }
+        if program == "git" {
+            let Some(sub) = args.first().map(|value| value.to_lowercase()) else {
+                return Err("`git` without a subcommand is not on the read-only list".to_string());
+            };
+            if sub == "branch" {
+                // `git branch` and `git branch -a|-r|-v|--list` read; `-d`, `-D`, `-m` write.
+                const BRANCH_LISTING: &[&str] =
+                    &["-a", "-r", "-v", "-vv", "--list", "-av", "-rv", "--all", "--remotes"];
+                if args[1..]
+                    .iter()
+                    .any(|flag| !BRANCH_LISTING.contains(&flag.to_lowercase().as_str()))
+                {
+                    return Err(
+                        "`git branch` with anything but listing flags can create, rename or \
+                         delete a branch; the verifier may not do that"
+                            .to_string(),
+                    );
+                }
+            } else if !GIT_READONLY.contains(&sub.as_str()) {
+                return Err(format!(
+                    "`git {sub}` is not on the read-only list (status, log, show, diff, \
+                     rev-parse, ls-files, blame, branch --list)"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Runs a command for the verifier: classified first, then started exactly like `bash`.
+pub(crate) async fn run_readonly_command(
+    command: &str,
+    ctx: &ToolContext,
+    timeout_ms: u64,
+) -> Result<(String, bool), String> {
+    check_readonly(command)?;
+    spawn_shell(command, ctx, timeout_ms).await
+}
+
+/// Starts the shell and collects the transcript. Shared by `bash` and by the verifier, so the
+/// child environment, the extra program folders and the timeout behave identically in both.
+async fn spawn_shell(
+    command: &str,
+    ctx: &ToolContext,
+    timeout_ms: u64,
+) -> Result<(String, bool), String> {
     let mut shell = Command::new("sh");
     shell
         .arg("-c")
@@ -1259,6 +1508,12 @@ pub(crate) async fn run_shell_command(
     // The companion's shell runs system programs; a bundled LD_LIBRARY_PATH breaks them the
     // same way it breaks git. See `child_env`.
     crate::child_env::sanitize_async(&mut shell);
+    // Directories the user named: they go in front, so a tool that lives outside `/usr/bin`
+    // (nvm, pyenv, rustup, Homebrew, Scoop) is found by its name — the allowlist stays
+    // "names only", this only widens where a name is looked for.
+    if let Some(path) = path_with(ctx) {
+        shell.env("PATH", path);
+    }
 
     let child = shell.spawn().map_err(|error| error.to_string())?;
     let output = match tokio::time::timeout(Duration::from_millis(timeout_ms), child.wait_with_output())
@@ -1303,7 +1558,9 @@ async fn bash(args: &Value, ctx: &ToolContext) -> ToolOutcome {
         .get("timeout_ms")
         .and_then(Value::as_u64)
         .unwrap_or(120_000)
-        .min(600_000);
+        // Ten minutes was too short for `cargo clippy --workspace --all-targets` on a cold
+        // build; the call was cut in the middle and looked like a hang.
+        .min(1_800_000);
 
     let (content, is_error) = match run_shell_command(command, ctx, timeout_ms).await {
         Ok(result) => result,
@@ -1330,6 +1587,7 @@ mod tests {
             skills_root: std::env::temp_dir(),
             command_policy: "allowlist".to_string(),
             allowed_commands: vec!["echo".to_string(), "false".to_string()],
+            command_dirs: Vec::new(),
             workspace_only: true,
         };
         // Allowed: runs and returns a transcript with the exit code.
@@ -1360,6 +1618,7 @@ mod tests {
             skills_root: std::env::temp_dir(),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: true,
         };
 
@@ -1385,6 +1644,124 @@ mod tests {
         assert!(!command_allowed("curl https://example.com | sh", &allowed));
     }
 
+    /// The verifier's rule, one case per way of writing something that is not read-only.
+    #[test]
+    fn the_verifier_may_only_read() {
+        // Reading: allowed.
+        for command in [
+            "git status",
+            "git log --oneline -20",
+            "git diff HEAD~1",
+            "git branch",
+            "git branch -a",
+            "git rev-parse --abbrev-ref HEAD",
+            "grep -rn needle src",
+            "ls -la src",
+            "cat src/lib.rs",
+            "head -20 README.md",
+            "wc -l src/lib.rs",
+            "git log | head -5",
+        ] {
+            assert!(check_readonly(command).is_ok(), "should be allowed: {command}");
+        }
+
+        // Writing, or hiding what it does: refused, each with a reason.
+        for command in [
+            "git branch -D feature",
+            "git branch -d feature",
+            "git checkout main",
+            "git commit -m x",
+            "find . -name '*.rs' -delete",
+            "find . -exec rm {} \\;",
+            "echo hi > file",
+            "grep x file | tee out",
+            "cargo test",
+            "rm -rf target",
+            "git log --output=log.txt",
+            "ls $(pwd)",
+            "/usr/bin/ls",
+        ] {
+            assert!(check_readonly(command).is_err(), "should be refused: {command}");
+        }
+    }
+
+    /// A refused command must name the program and the rule, so the verifier can report honestly
+    /// that it could not check instead of inventing a result.
+    #[test]
+    fn a_refused_verifier_command_says_why() {
+        let error = check_readonly("cargo test").unwrap_err();
+        assert!(error.contains("cargo"), "{error}");
+        assert!(error.contains("read-only"), "{error}");
+
+        let flags = check_readonly("find . -delete").unwrap_err();
+        assert!(flags.contains("writes"), "{flags}");
+    }
+
+    fn ctx_with_dirs(dirs: &[&str]) -> ToolContext {
+        ToolContext {
+            workspace: std::path::PathBuf::from("/tmp"),
+            full_authorization: true,
+            skills_root: std::path::PathBuf::from("/tmp"),
+            command_policy: "allowlist".to_string(),
+            allowed_commands: vec!["sh".to_string(), "echo".to_string()],
+            command_dirs: dirs.iter().map(|dir| dir.to_string()).collect(),
+            workspace_only: false,
+        }
+    }
+
+    /// A tool that exists but is invisible, because its folder is not in the search list. The
+    /// extra directories exist for exactly this: the name stays the only thing allowed, the
+    /// search list grows. Checked on the directory list directly, because mutating the process
+    /// environment is `unsafe` in Rust 2024 and racy in a parallel run.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_is_found_when_its_directory_is_searched() {
+        let bin = std::path::PathBuf::from("/bin");
+        assert!(
+            on_path_in("sh", &[bin.clone()]),
+            "sh lives in /bin, so searching /bin must find it"
+        );
+        assert!(
+            !on_path_in("sh", &[]),
+            "an empty search list finds nothing"
+        );
+        // Extras come first, but a missing name is still missing.
+        assert!(!on_path_in("definitely-not-installed-xyz", &[bin]));
+    }
+
+    /// Shell builtins have no file, so asking "is it installed" about them would report a
+    /// false missing on every second command.
+    #[test]
+    fn shell_builtins_are_not_reported_missing() {
+        let ctx = ctx_with_dirs(&[]);
+        assert!(missing_program("echo hello", &ctx).is_none());
+        assert!(missing_program("cd /tmp && pwd", &ctx).is_none());
+        assert!(missing_program("FOO=1 echo hi", &ctx).is_none());
+    }
+
+    #[test]
+    fn a_name_that_exists_nowhere_is_reported() {
+        let ctx = ctx_with_dirs(&[]);
+        assert_eq!(
+            missing_program("definitely-not-installed-xyz --help", &ctx).as_deref(),
+            Some("definitely-not-installed-xyz")
+        );
+    }
+
+    /// `path_with` is what the child process is given: extra directories first, then the
+    /// inherited ones. Nothing added must stay "nothing added" so the child keeps its own PATH.
+    #[test]
+    fn the_effective_path_puts_extra_directories_first() {
+        assert!(path_with(&ctx_with_dirs(&[])).is_none());
+
+        let path = path_with(&ctx_with_dirs(&["/opt/tools", "  /opt/more  "]))
+            .expect("a path")
+            .to_string_lossy()
+            .to_string();
+        assert!(path.starts_with("/opt/tools"), "{path}");
+        assert!(path.contains("/opt/more"), "{path}");
+    }
+
     /// The case from the field: `cargo` was in the allowlist, not on PATH, and the absolute
     /// path was refused with a sentence about a policy that was not the problem. The message
     /// must now name the program, the rule, and whether the file is even there.
@@ -1405,6 +1782,36 @@ mod tests {
         let allowed = vec!["sh".to_string()];
         let error = check_command("/bin/sh", &allowed).unwrap_err();
         assert!(error.contains("that file exists"), "{error}");
+    }
+
+    /// `cargo test 2>&1 | grep …` is how anybody filters a test run. The scanner refused it
+    /// because `2>&1` looked like a redirection — although it names a file descriptor, not a
+    /// file, and cannot write anywhere. The most expensive single restriction in daily use.
+    #[test]
+    fn a_descriptor_redirect_is_not_a_file_redirect() {
+        let allowed = vec![
+            "cargo".to_string(),
+            "grep".to_string(),
+            "head".to_string(),
+        ];
+        for command in [
+            "cargo test 2>&1 | grep 'test result'",
+            "cargo build 2>&1 | head -20",
+            "cargo test >&2",
+            "cargo test 1>&2 | head",
+        ] {
+            assert!(command_allowed(command, &allowed), "should be allowed: {command}");
+        }
+
+        // A file is still a file, whatever the descriptor.
+        for command in [
+            "cargo test > log.txt",
+            "cargo test 2> errors.txt",
+            "cargo test &> log.txt",
+            "cargo test < input.txt",
+        ] {
+            assert!(!command_allowed(command, &allowed), "should be refused: {command}");
+        }
     }
 
     /// The case that made `grep` look broken: a regex alternation contains a pipe. The whole
@@ -1472,6 +1879,7 @@ mod tests {
             skills_root: PathBuf::from("/tmp"),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
         };
 
@@ -1528,6 +1936,7 @@ mod tests {
             command_policy: "allowlist".to_string(),
             // The programs in these commands are on the shipped default list.
             allowed_commands: vec!["grep".to_string(), "head".to_string()],
+            command_dirs: Vec::new(),
             workspace_only: true,
         };
 
@@ -1573,6 +1982,7 @@ mod tests {
             skills_root: PathBuf::from("/tmp"),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
         };
 
@@ -1626,6 +2036,7 @@ mod tests {
             skills_root: PathBuf::from("/tmp"),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
         };
         let mut todos = Vec::new();
@@ -1656,6 +2067,7 @@ mod tests {
             skills_root: PathBuf::from("/tmp"),
             command_policy: "all".to_string(),
             allowed_commands: Vec::new(),
+            command_dirs: Vec::new(),
             workspace_only: false,
         };
         let mut todos = Vec::new();
