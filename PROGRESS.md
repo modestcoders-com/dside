@@ -6097,3 +6097,29 @@ Schemafehler, also hätte ihn sonst kein Test bemerkt.
 Modellzug; dieser Abschnitt beschreibt nur, was der Text jetzt sagt.
 
 `cargo test --lib` **133** / 14 ignoriert. Kein Verhalten geändert, kein Schema, kein Werkzeug.
+
+## 138. Ein Verfahren, nicht nur Haltung (2026-11-25)
+
+Die Persona war ein Katalog von Verboten und eine gute Portion Charakter: nichts behaupten, was
+nicht aus einem Werkzeugergebnis kommt; nicht kuschen; keine Notiz auf eine Vermutung bauen. Was
+fehlte, war eine Reihenfolge — kein Satz sagte, wie man anfängt.
+
+Neu ist der Abschnitt **„How you approach a task"**, sieben Punkte: erst nachsehen, was da ist,
+bevor man schreibt; einmal in zwei Zeilen sagen, was man verstanden hat, dann handeln; die
+kleinste Änderung machen und fremden Code nicht mit aufräumen; die Planliste in Reihenfolge
+abarbeiten; prüfen, bevor man berichtet; einmal fragen und dann entscheiden statt raten; aufhören,
+wenn das Gefragte fertig ist, und Gefundenes nennen statt gleich mitzuerledigen.
+
+Die Werkzeugliste darunter nennt jetzt auch `code_review` und `skill` — beide existierten, standen
+aber nicht in der Aufzählung, die der Begleiter liest.
+
+**Was ausdrücklich nicht angefasst wurde:** jede Tonregel, die Regel „nichts behaupten, was nicht
+aus einem Werkzeugergebnis kommt", „ein Plan ist kein Ergebnis", „deference is not respect", die
+Notizregeln und die Namensregeln. Der Abschnitt ist eine Ergänzung, keine Neufassung: Die Haltung
+war richtig, es fehlte das Verfahren.
+
+Belegt: `buildPersona` gerendert (8950 Zeichen) und auf die Abschnitte geprüft — der neue
+Abschnitt ist da, und die drei alten Regeln sind es weiterhin. `vue-tsc` grün.
+
+**Ungemessen:** ob der Begleiter dadurch besser arbeitet. Text ist kein Verhalten; das entscheidet
+erst ein echter Modellzug.
