@@ -39,6 +39,18 @@ DeepSeek. Seven weeks without a handover is not a schedule, it is a pattern.
 - **Then decide: ship or stop.** If ship: 0.6.8 with the plugin round and the companion round, then
   the package for DeepSeek. If stop: a final README line and this file closed, tags untouched.
 
+## Found by QA
+
+Not fixed, because each one is a decision rather than a slip. See `docs/qa-log.md` for the runs.
+
+- **A search hit in an archived thread opens without a title.** `sessions_list` returns only
+  unarchived threads, and the title bar derives its text from that list; search does not filter by
+  the archive flag, so a hit in an archived thread opens the conversation while the header stays
+  empty and the rail shows no active entry. Verified against the same flow on an unarchived thread,
+  where both are correct. The open question is what should happen: exclude archived threads from
+  search (loses the main reason to archive instead of delete), show them read-only, or unarchive on
+  open. Frontend-only, and this project has no frontend test runner — a Rust test would not cover it.
+
 ## Done in 0.6.5 (published 2026-11-15)
 
 - **One instance.** A second start raises the existing window instead of adding a copy; seven of

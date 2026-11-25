@@ -30,3 +30,28 @@ drei Einträge.
 Anmerkung, kein Fehler: Archivieren und Wiederherstellen schreiben keine Zeile ins Anwendungslog.
 Für die Fehlersuche wäre eine Zeile nützlich gewesen, aber es gibt keine Anforderung, die das
 verlangt — deshalb nur diese Notiz, keine Änderung.
+
+## 2026-11-25 23:00 — Punkt 2: Suche im Verlauf — bestanden, mit einem Fund
+
+Gesucht wurde ein Begriff, der in der Kopie genau **einmal** vorkommt, und zwar in einer alten,
+archivierten Sitzung: `ALLER-ALLER-ERSTEN` (1 Nachricht, aus Mitte Oktober).
+
+- Die Suche fand genau einen Treffer, Abzeichen „Nachricht", Sitzungstitel „Unheimliche Begegnung
+  der vierten Art", und der Ausschnitt war um den Begriff zentriert:
+  „…in DEINER (Deepseeks) ALLER-ALLER-ERSTEN EIGENEN Agentic IDE."
+- Auch Titeltreffer funktionieren (Abzeichen „Sitzung"), geprüft mit dem Projektnamen.
+- Ein Klick auf einen Treffer schließt den Dialog und lädt den Verlauf der Sitzung (die erste
+  Nachricht „Hallo! Ist jemand zuhause?" stand danach im Chat).
+- Die Suche ändert den Archiv-Zustand nicht: die archivierte Sitzung blieb `archived = 1`.
+
+**Fund (in `TODO.md` unter „Found by QA", nicht behoben):** Ein Treffer in einer **archivierten**
+Sitzung öffnet den Verlauf, aber die Kopfzeile bleibt leer und die Seitenleiste zeigt keinen
+aktiven Eintrag. Ursache: `sessions_list` liefert nur nicht-archivierte Sitzungen, und der Titel
+leitet sich aus dieser Liste ab; die Suche filtert nicht nach dem Archiv-Zustand. Gegenprobe mit
+einer nicht-archivierten Sitzung: Titel und Markierung stimmen dort.
+
+Bewusst nicht behoben: Die Frage dahinter ist eine Entscheidung, keine Nachlässigkeit — sollen
+archivierte Sitzungen überhaupt in Treffern erscheinen (dann: nur lesen, oder beim Öffnen
+reaktivieren), oder gar nicht (dann verliert das Archiv seinen Sinn). Außerdem ist es reine
+Frontend-Logik, und dieses Projekt hat keinen Testläufer für das Frontend; ein Rust-Test würde
+die Stelle nicht abdecken.
