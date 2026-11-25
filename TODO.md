@@ -20,16 +20,24 @@ time belongs to the companion.
 **Then:** freeze. 0.6.7 plus the companion round, checked properly, and then the package for
 DeepSeek. Seven weeks without a handover is not a schedule, it is a pattern.
 
-## The companion round (in progress, 2026-11-25)
+## Done in the companion round (2026-11-25)
 
-- **The tool descriptions are the half of the prompt nobody looks at.** `read` is one sentence.
-  Each one gets: what it does, when to use it instead of its sibling, one example, and the limits
-  that actually exist in the code.
-- **The persona is fifty prohibitions and almost no procedure.** The tone rules stay as they are;
-  what is missing is a short and explicit way to approach a task: look, plan, smallest change,
-  verify, report.
-- **There is no way to tell whether any of it helped.** Ten concrete tasks with what a good answer
-  looks like, so "the companion is better now" is a measurement instead of a claim.
+- **The tool descriptions are the half of the prompt nobody looks at.** Eighteen were a single
+  sentence; each now names what the tool does, when to use it instead of its sibling, an example
+  call and the limit that exists in the code. A test refuses anything under 60 characters.
+- **The persona is fifty prohibitions and almost no procedure.** A new section, "How you approach a
+  task", adds the order — look, say what you understood, smallest change, work the plan, verify,
+  ask once, stop when done. Every tone rule is untouched on purpose.
+- **There was no way to tell whether any of it helped.** `docs/companion-checks.md` holds ten
+  concrete tasks with what a good and a bad answer look like, scored before and after. It is still
+  unmeasured: that needs ten real conversations and the user's judgement.
+
+## What is left before the freeze
+
+- **Run the ten checks.** The one measurement nobody else can do. Same model, same permission
+  stage, fresh thread for each task.
+- **Then decide: ship or stop.** If ship: 0.6.8 with the plugin round and the companion round, then
+  the package for DeepSeek. If stop: a final README line and this file closed, tags untouched.
 
 ## Done in 0.6.5 (published 2026-11-15)
 

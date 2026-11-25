@@ -6123,3 +6123,17 @@ Abschnitt ist da, und die drei alten Regeln sind es weiterhin. `vue-tsc` grün.
 
 **Ungemessen:** ob der Begleiter dadurch besser arbeitet. Text ist kein Verhalten; das entscheidet
 erst ein echter Modellzug.
+
+## 139. Zehn Aufgaben, damit „besser" messbar wird (2026-11-25)
+
+Der Abschluss der Begleiter-Runde. `docs/companion-checks.md` enthält zehn Aufgaben, jede mit dem,
+was eine gute Antwort auszeichnet, was eine schlechte auszeichnet und woran man die beiden
+auseinanderhält: ein fremdes Projekt lesen, eine kleine Änderung, etwas finden, eine Änderung über
+mehrere Schichten, einen Fehlschlag zugeben, eine Behauptung belegen, fragen oder entscheiden, eine
+Regel aushalten, sehen statt beschreiben, erinnern ohne Sammeln. Dazu eine Tabelle zum Ankreuzen
+vorher/nachher — und der Satz, dass eine Änderung, die weniger als drei Aufgaben verbessert und
+keine verschlechtert, Geschmack ist und keine Verbesserung.
+
+**Was fehlt, ist der Lauf.** Die Liste macht einen Vergleich möglich; sie ersetzt ihn nicht. Zehn
+Aufgaben, jede in einem neuen Thread, gleiches Modell, gleiche Berechtigungsstufe — das braucht
+einen echten Modellzug und ein Urteil, das nur der Nutzer fällen kann.
