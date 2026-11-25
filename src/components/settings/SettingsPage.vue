@@ -11,6 +11,7 @@ import DiagnosticsPanel from "./DiagnosticsPanel.vue";
 import KeyboardPanel from "./KeyboardPanel.vue";
 import RudderDialog from "../RudderDialog.vue";
 import SandboxPanel from "./SandboxPanel.vue";
+import PluginsPanel from "./PluginsPanel.vue";
 import WorkspacePicker from "../WorkspacePicker.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { locale, localeLabel, locales, setLocale, t } from "../../i18n";
@@ -124,6 +125,7 @@ const groups = computed<NavGroup[]>(() => [
     items: [
       { id: "account", label: "settings.items.account", icon: "user" },
       { id: "sandbox", label: "settings.items.sandbox", icon: "shield" },
+      { id: "plugins", label: "settings.items.plugins", icon: "robot" },
       { id: "diagnostics", label: "settings.items.diagnostics", icon: "monitor" },
       { id: "about", label: "settings.items.about", icon: "doc" },
     ],
@@ -692,6 +694,11 @@ watch(
       <template v-else-if="activeItem === 'sandbox'">
         <h1 class="title">{{ t("settings.items.sandbox") }}</h1>
         <SandboxPanel />
+      </template>
+
+      <template v-else-if="activeItem === 'plugins'">
+        <h1 class="title">{{ t("settings.items.plugins") }}</h1>
+        <PluginsPanel />
       </template>
 
       <template v-else-if="activeItem === 'partner'">

@@ -201,6 +201,11 @@ export async function configureEngine(): Promise<void> {
       contextWindow: modelChoices().find((entry) => entry.id === settings.model)?.contextWindow ?? null,
       // Everyday mode takes the shell, code review and sub-agents away from the partner.
       disabledTools: everydayMode.value ? [...EVERYDAY_DISABLED_TOOLS] : [],
+      // Plugins: a second folder beside the app's own, and which ids are on for this project.
+      // The engine resolves an empty workspace to the home folder itself, so the map is passed
+      // as it is stored rather than resolved here — one rule, not two.
+      pluginRoot: settings.pluginRoot,
+      enabledPlugins: settings.enabledPlugins,
     },
   });
   await refreshSecret();

@@ -64,6 +64,16 @@ sake of a sandbox we do not claim to provide — the honest boundary is the same
 - Discovery reads `<root>/*/plugin.json`, tolerates broken manifests (skip and log), and never
   executes anything during discovery.
 
+## Naming
+
+`plugin__<id>__<tool>`, normalised to `[a-z0-9_]` — the same shape and the same reason as the MCP
+prefix: an external tool must be recognisable at a glance, because the app's own contract does not
+cover what a stranger's program does. Without a prefix a plugin could call a tool `bash` and shadow
+the built-in one.
+
+The split is done against the known plugin ids, not on the `__` separator, so a tool whose own name
+contains an underscore stays unambiguous. The panel shows the resulting name, so it is not a guess.
+
 ## Permissions and trust
 
 - `entry` is executed only after the user enables the plugin in that project; enabling is an
@@ -72,10 +82,19 @@ sake of a sandbox we do not claim to provide — the honest boundary is the same
 - A tool call from a plugin goes through the same gate as `bash`: first use in a session is
   confirmed (unless the stage is full access), later calls in that session run without asking, and
   read-only mode does not offer plugin tools at all.
+- **No shell, no plugins.** Everyday mode takes `bash` away; plugin tools disappear with it. "No
+  shell in this mode" and "a stranger's program in this mode" would otherwise be two different
+  promises about the same thing.
 - Plugin tools run with the workspace as their working directory and with the child environment
   sanitised (`child_env.rs`), so a bundle's `LD_LIBRARY_PATH` cannot leak into them.
 - No plugin update happens on its own. Replacing a plugin's files is the user's act; the panel
   shows a changed hash after it happened.
+- **Notes go into the prompt, not through a tool.** An enabled plugin's `SERVER.md` is appended to
+  the system prompt under a heading that says it came from the plugin's authors and cannot change
+  the companion's rules. A folder with only notes therefore needs no program and no round trip.
+- **The panel can test a plugin without a conversation.** A button starts the server once, runs
+  the handshake and lists what it offers against what the manifest allows: allowed, refused,
+  missing. This is how a broken plugin is found without waiting for a model turn.
 
 ## Enabling per project
 
@@ -91,6 +110,17 @@ projects changes what the companion can do without touching the filesystem.
 - Disabling removes the tools from the next turn's definitions and the panel says so.
 - Tests: manifest parsing (broken JSON, missing id, unknown entry), tool filtering, and the "off
   is not uninstall" rule.
+
+## Built (2026-11-25)
+
+`src-tauri/src/jsonrpc.rs` (the shared stdio client) and `src-tauri/src/plugins.rs`, wired into
+the turn in `engine/mod.rs`, with `PluginsPanel.vue` under Settings. 17 tests cover discovery,
+naming, the offer path (`definitions_in`), the prompt notes, a real server through a probe, and a
+real `tools/call` round trip.
+
+Still open: a **real model turn** that uses a plugin tool. The offer path is tested with a real
+child process, but no conversation has called one yet — that needs a model call, and therefore the
+user.
 
 ## Out of scope
 

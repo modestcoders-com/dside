@@ -6007,3 +6007,66 @@ zeigt auf das AppImage, das mit HTTP 200 und 90 798 584 Bytes antwortet; `latest
 
 Mit dieser Version sollte die installierte 0.6.6 beim nächsten Start **„Update 0.6.7"** in der
 Titelleiste zeigen — und Shelly sollte das AppImage anbieten.
+
+## 136. Plugins mit Code, Notizen ohne Programm (2026-11-25)
+
+Die erste der drei Specs aus 0.6.6, umgesetzt. Ein Plugin ist ein Ordner in `plugins/` mit einem
+Manifest; ein optionales Programm darin spricht dasselbe JSON-RPC über stdio, das der MCP-Client
+sprechen wird. Textplugins brauchen keinen Codepfad — ihre Notizen gehen in den Prompt.
+
+### Ein Transport statt zwei
+
+`jsonrpc.rs` ist ein kleiner Client über stdin/stdout eines Kindprozesses: `initialize`,
+`notifications/initialized`, `tools/list`, `tools/call`, eine JSON-Zeile pro Nachricht, Zeitlimits
+und jeder Fehler als Satz. Die Entscheidung aus der Spec trägt hier ihre erste Frucht — dieselbe
+Datei wird die MCP-Runde benutzen, ohne dass an der Framing-Logik etwas neu zu schreiben ist.
+
+Ein Server, der beim Start etwas auf stdout druckt, was kein JSON ist, wird übergangen statt als
+Antwort gelesen; ein stummes Kind läuft in ein Zeitlimit statt den Zug zu blockieren. Ein Test mit
+`sh` beweist beides — ehrlich gesagt nur auf Unix, denn auf Windows gibt es keine Shell.
+
+### Warum ein Namensraum, obwohl die Spec ihn nicht nennt
+
+Die Spec für MCP begründet `mcp__<server>__<tool>` damit, dass ein fremdes Werkzeug auf einen Blick
+erkennbar sein muss: Der Vertrag der App deckt nicht, was ein fremdes Programm tut. Dasselbe gilt
+für ein Plugin. Ohne Präfix könnte ein Plugin ein Werkzeug `bash` nennen und das eingebaute
+verdecken. Also `plugin__<id>__<tool>`, kleingeschrieben und auf `[a-z0-9_]` normalisiert; getrennt
+wird gegen die bekannten Plugin-IDs, nicht am `__` — ein Werkzeugname mit Unterstrich bleibt dadurch
+eindeutig. Die Spec ist entsprechend ergänzt.
+
+### Was das Manifest darf und was nicht
+
+Ein Server, der mehr Werkzeuge anbietet als sein Manifest nennt, bekommt die zusätzlichen nicht:
+Das Manifest entscheidet die Oberfläche, nicht die neue Binärdatei. Der Testserver bietet `ping` und
+`secret` an, das Manifest nennt nur `ping` — der Probelauf meldet „Erlaubt: ping, Abgelehnt: secret".
+Ein Manifest, das ein Werkzeug nennt, das der Server nicht anbietet, wird als „fehlt" gemeldet statt
+als Werkzeug angeboten.
+
+Der Fingerabdruck im Panel ist FNV-1a, ausdrücklich kein Sicherheits-Hash: Er soll sich ändern, wenn
+die Datei sich ändert, und über Rust-Versionen stabil bleiben — was `DefaultHasher` nicht verspricht.
+
+### Dieselbe Tür wie die Shell
+
+Ein Plugin-Werkzeug läuft durch dasselbe Gate wie `bash`: erste Benutzung im Thread wird bestätigt
+(auch „immer" und „für diese Sitzung" funktionieren, weil die Freigaben am Namen hängen), spätere
+nicht mehr. Im Lesemodus wird nichts angeboten. **Und im Alltagsmodus auch nicht** — dort nimmt die
+App die Shell weg, und „keine Shell hier" plus „ein fremdes Programm hier" wären zwei Versprechen
+über dieselbe Sache. Diese Regel stand nicht in der Spec; sie steht jetzt drin.
+
+### Was im gepackten Build belegt ist
+
+Mit einer Kopie der Datenbank in einem eigenen Datenverzeichnis und einem echten Demo-Plugin
+(`SERVER.md`, Shell-Server, zwei Werkzeuge, eines davon absichtlich nicht im Manifest):
+
+- Das Panel unter Einstellungen → Plugins zeigt Kennung, Version, Autor, Notizen-Hinweis, Programm,
+  Beschreibung, `plugin__demo__ping`, Pfad und Fingerabdruck.
+- „Testen" meldet: **Erlaubt `ping` · Abgelehnt `secret` · Fehlt —**.
+- Der Schalter schreibt `{"<workspace>":["demo"]}` in die Einstellungen; erneutes
+  Ausschalten schreibt `[]`, und die drei Dateien des Plugins liegen unverändert da.
+
+**Nicht belegt:** ein echter Modellzug, der ein Plugin-Werkzeug aufruft. Der Weg bis zur
+Werkzeugliste ist mit einem echten Kindprozess getestet (`definitions_in`), aber kein Gespräch hat
+eines benutzt — dafür braucht es einen Modellaufruf.
+
+`cargo test --lib` **132** / 14 ignoriert, `vue-tsc` grün, i18n 555 Schlüssel, `check:private`
+sauber. Nichts committet, kein Release-Paket gebaut.

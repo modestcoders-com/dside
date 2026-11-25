@@ -11,8 +11,10 @@ mod child_env;
 mod db;
 mod engine;
 mod git_panel;
+mod jsonrpc;
 mod logs;
 mod memory_check;
+mod plugins;
 mod preview;
 #[cfg(target_os = "linux")]
 mod portal;
@@ -1229,6 +1231,54 @@ fn log_message(text: String) {
     crate::log_line!("ui: {text}");
 }
 
+// ---------------------------------------------------------------------------
+// Plugins
+// ---------------------------------------------------------------------------
+
+/// Every plugin the two roots contain — broken ones included, with their reason. Reading this
+/// starts nothing: discovery only reads manifests.
+#[tauri::command]
+fn plugins_list(app: AppHandle, root: Option<String>) -> Vec<plugins::PluginInfo> {
+    plugins::list(&app, root.as_deref().unwrap_or(""))
+}
+
+/// Starts one plugin's server, asks what it offers, kills it. Without this, checking a plugin
+/// would need a model turn, and a broken one would only be noticed in a conversation.
+#[tauri::command]
+async fn plugins_probe(
+    app: AppHandle,
+    root: Option<String>,
+    id: String,
+) -> Result<plugins::ProbeReport, String> {
+    plugins::probe(&app, root.as_deref().unwrap_or(""), &id).await
+}
+
+/// The folder the panel offers to open. Created on demand: an empty folder the user can drop a
+/// plugin into is a better first run than an error saying it does not exist.
+#[tauri::command]
+fn plugins_root(app: AppHandle) -> Result<String, String> {
+    let directory = plugins::default_root(&app)?;
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn plugins_open_root(app: AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let directory = plugins::default_root(&app)?;
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    app.opener()
+        .open_path(directory.to_string_lossy().to_string(), None::<String>)
+        .map_err(|error| error.to_string())
+}
+
+/// Kills a running server. Not shown in the first panel, but a plugin whose binary was replaced
+/// needs it, and a stale process is worse than no process.
+#[tauri::command]
+fn plugins_forget(id: String) {
+    plugins::forget(&id);
+}
+
 /// Shows the splash only once its artwork is on screen — the window is created hidden for
 /// exactly this reason, so nobody sees a black rectangle while the webview boots.
 #[tauri::command]
@@ -1468,6 +1518,11 @@ pub fn run() {
             skills::skills_root_path,
             skills::skill_read,
             skills::skill_write,
+            plugins_list,
+            plugins_probe,
+            plugins_root,
+            plugins_open_root,
+            plugins_forget,
             secret::secret_status,
             secret::secret_set,
             secret::secret_clear,
@@ -1491,8 +1546,15 @@ pub fn run() {
             preview::preview_start,
             test_bridge::test_bridge_report,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        // An exit handler, because a plugin server started during a turn is a child process:
+        // dropping the handle kills it, but a clean quit never drops anything on purpose.
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                plugins::shutdown();
+            }
+        });
 }
 
 #[cfg(test)]

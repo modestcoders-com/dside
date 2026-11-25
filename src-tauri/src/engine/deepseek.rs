@@ -386,6 +386,8 @@ mod live {
             context_window: None,
             disabled_tools: Vec::new(),
             ask_timeout_seconds: 300,
+            plugin_root: String::new(),
+            enabled_plugins: Default::default(),
         })
     }
 

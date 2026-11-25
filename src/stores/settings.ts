@@ -43,6 +43,11 @@ export interface SettingsState {
   reasoningEffort: string;
   /** How long a question or an approval waits before the turn gives up, in minutes. */
   askTimeoutMinutes: number;
+  /** A second folder scanned for plugins, next to the app's own. Empty = only the app's own. */
+  pluginRoot: string;
+  /** Plugin ids enabled per folder. The same plugin can be on in one project and off in
+   *  another; turning it off never touches its files. */
+  enabledPlugins: Record<string, string[]>;
   /** Set once the first-start dialog has been answered or dismissed. */
   onboarded: boolean;
 }
@@ -128,6 +133,8 @@ const PERSISTED_KEYS: (keyof SettingsState)[] = [
   "keepInBackground",
   "reasoningEffort",
   "askTimeoutMinutes",
+  "pluginRoot",
+  "enabledPlugins",
   "onboarded",
 ];
 
@@ -160,6 +167,8 @@ const defaults: SettingsState = {
   reasoningEffort: "",
   // Five minutes is a guess about somebody's attention; the field exists so it can be wrong.
   askTimeoutMinutes: 5,
+  pluginRoot: "",
+  enabledPlugins: {},
   onboarded: false,
 };
 

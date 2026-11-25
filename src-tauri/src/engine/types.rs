@@ -54,6 +54,14 @@ pub struct EngineConfig {
     /// stepped away or are still reading.
     #[serde(default = "default_ask_timeout")]
     pub ask_timeout_seconds: u64,
+    /// A second folder to scan for plugins, next to the app's own `plugins/`. For a shared or
+    /// version-controlled collection; empty means "only the app's own folder".
+    #[serde(default)]
+    pub plugin_root: String,
+    /// Plugin ids enabled per folder. Keyed by the workspace path, because the same plugin may
+    /// be on in one project and off in another — the files do not move either way.
+    #[serde(default)]
+    pub enabled_plugins: std::collections::HashMap<String, Vec<String>>,
 }
 
 /// Five minutes: long enough to answer a question, short enough that a forgotten one does not

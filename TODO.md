@@ -3,6 +3,34 @@
 What is left, in the order I would do it. `PROGRESS.md` is the record of what happened;
 this file is the list of what has not.
 
+## The scope, decided 2026-11-25
+
+Written down because it is the question that kept producing new work. Between 0.6.3 and 0.6.7
+every release added a capability, and the one thing the product is judged by — how well the
+companion does the work — was never measured.
+
+**In:** the chat with one companion that reads and writes files, runs allowed commands, browses,
+renders previews, remembers and verifies; projects with threads; settings that keep what they
+promise.
+
+**Out until further notice:** a plugin store, an MCP client, a release reviewer, several windows in
+one process. Not because they are bad ideas — because an empty mechanism is not a feature, and the
+time belongs to the companion.
+
+**Then:** freeze. 0.6.7 plus the companion round, checked properly, and then the package for
+DeepSeek. Seven weeks without a handover is not a schedule, it is a pattern.
+
+## The companion round (in progress, 2026-11-25)
+
+- **The tool descriptions are the half of the prompt nobody looks at.** `read` is one sentence.
+  Each one gets: what it does, when to use it instead of its sibling, one example, and the limits
+  that actually exist in the code.
+- **The persona is fifty prohibitions and almost no procedure.** The tone rules stay as they are;
+  what is missing is a short and explicit way to approach a task: look, plan, smallest change,
+  verify, report.
+- **There is no way to tell whether any of it helped.** Ten concrete tasks with what a good answer
+  looks like, so "the companion is better now" is a measurement instead of a claim.
+
 ## Done in 0.6.5 (published 2026-11-15)
 
 - **One instance.** A second start raises the existing window instead of adding a copy; seven of
@@ -106,16 +134,38 @@ this file is the list of what has not.
   ran before the watcher existed, so it was only written at the next unrelated change; it now
   writes its result immediately, once.
 
+## Done in the plugins round (in the working tree, 2026-11-25)
+
+- **Plugins with code, and notes without any.** A folder in `plugins/` with a `plugin.json` is a
+  plugin; an optional `entry` program speaks the same JSON-RPC over stdio the MCP client will use.
+  Tools are exposed as `plugin__<id>__<tool>` — the prefix so a foreign tool is recognisable, the
+  split done against known ids so an underscore in a tool name is not ambiguous. The manifest
+  decides the surface: a server offering more than its manifest names is refused.
+- **Per project, and immediate.** The switch in the new Settings → Plugins panel applies to the
+  folder the thread runs in; off removes the tools from the next turn and leaves the files alone.
+  The panel shows id, version, author, the exposed names, the path and a fingerprint of the
+  program.
+- **"Test" without a conversation.** A button starts the server once and lists offered vs.
+  allowed vs. missing — the only way to check a plugin without spending a model call.
+- **Notes reach the prompt.** `SERVER.md` of an enabled plugin is appended under a heading that
+  says it came from the plugin's authors and cannot change the rules. A notes-only folder needs no
+  program.
+- **Same gate as `bash`.** First use in a session is confirmed, later calls are not; read mode
+  offers none, and everyday mode loses them together with the shell.
+
+132 tests, `vue-tsc`, i18n (555 keys) and `check:private` are green. A real model turn with a
+plugin tool is still unproven — that needs a conversation.
+
 ## Specs written, waiting for the go-ahead
 
 Each one is a page in `docs/specs/`. The decisions are taken; what remains is the order.
 
-- **Plugins that may carry code** — `docs/specs/plugins.md`. A plugin is a folder with a manifest,
-  optional notes and an optional program that speaks JSON-RPC over stdio — the same transport the
-  MCP client will use, so one permission gate covers both. Text-only plugins need no code path of
-  their own. Built-in skills stay built-in (decided). Disabling is immediate and leaves files on
-  disk. No store in the first version; when there is a reason, a single repository with a
-  `marketplace.json` and a SHA-256 per entry, which is what ZCode does.
+- **A store for plugins is out of scope for now, and the decision stands.** When there is a reason
+  for one, the shape is: a single repository with a `marketplace.json` and a SHA-256 per entry,
+  which is what ZCode does. Borrowing *their* store is not the same thing: their 58 entries are
+  skill bundles (markdown plus scripts) with a manifest we do not read, some with MCP servers and
+  a pre-write hook system DS.IDE does not have.
+
 - **MCP client** — `docs/specs/mcp-client.md`. Tool names are `mcp__<server>__<tool>`: double
   underscore so a name with a single one cannot be misread, and the `mcp__` prefix so an external
   tool is distinguishable from a built-in one at a glance. Dashes and dots are normalised away —

@@ -1171,6 +1171,25 @@ fn requires_approval(name: &str) -> bool {
     matches!(name, "write" | "edit" | "bash")
 }
 
+/// One entry point for both kinds of tool: a plugin's, or the app's own. It lives here rather
+/// than inside `tools::execute` because a plugin needs the app handle and the configuration,
+/// which the tool table deliberately does not have — and because a plugin that is not enabled
+/// must fall through to the built-in table instead of shadowing a name.
+async fn dispatch_tool(
+    app: &AppHandle,
+    config: &EngineConfig,
+    workspace: &str,
+    name: &str,
+    arguments: &Value,
+    ctx: &tools::ToolContext,
+    todos: &mut Vec<Value>,
+) -> tools::ToolOutcome {
+    if let Some(outcome) = crate::plugins::execute(app, config, workspace, name, arguments).await {
+        return outcome;
+    }
+    tools::execute(name, arguments, ctx, todos).await
+}
+
 fn permission_summary(name: &str, args: &Value) -> String {
     let text = |key: &str| {
         args.get(key)
@@ -2249,6 +2268,8 @@ mod tests {
             context_window: None,
             disabled_tools: Vec::new(),
             ask_timeout_seconds: 300,
+            plugin_root: String::new(),
+            enabled_plugins: Default::default(),
         })
     }
 
@@ -2462,6 +2483,8 @@ mod tests {
             context_window: None,
             disabled_tools: Vec::new(),
             ask_timeout_seconds: seconds,
+            plugin_root: String::new(),
+            enabled_plugins: Default::default(),
         };
 
         assert_eq!(ask_timeout(&with(300)), std::time::Duration::from_secs(300));
@@ -2713,7 +2736,7 @@ async fn run_turn(
         .iter()
         .map(|name| name.trim().to_lowercase())
         .collect();
-    let definitions: Vec<Value> = tools::definitions()
+    let mut definitions: Vec<Value> = tools::definitions()
         .into_iter()
         .filter(|definition| {
             let name = definition
@@ -2732,6 +2755,19 @@ async fn run_turn(
             !name.map(|name| disabled.contains(&name.to_lowercase())).unwrap_or(false)
         })
         .collect();
+
+    // Plugins: foreign programs, opt-in per project. They are not offered where the shell is
+    // not — everyday mode — because "no shell here" and "a stranger's program here" are the
+    // same promise to the user. Read-only mode offers none either: nobody knows what a foreign
+    // tool does, so calling it "read" would be a claim we cannot keep.
+    let plugins_allowed = config.permission != "read"
+        && !config
+            .disabled_tools
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case("bash"));
+    if plugins_allowed {
+        definitions.extend(crate::plugins::definitions(app, config, &workspace).await);
+    }
     let mut todos: Vec<Value> = Vec::new();
 
     let mut system_prompt = if config.system_prompt.trim().is_empty() {
@@ -2759,6 +2795,12 @@ async fn run_turn(
              they take precedence over general habits.\n\n",
         );
         system_prompt.push_str(&rules);
+    }
+
+    // Notes a plugin ships for the companion. A folder with only SERVER.md is readable this way
+    // and changes nothing else — no process is started for it.
+    if plugins_allowed {
+        system_prompt.push_str(&crate::plugins::notes_block(app, config, &workspace));
     }
 
     messages.insert(0, ChatMessage::system(system_prompt));
@@ -3207,7 +3249,12 @@ async fn run_turn(
                 } else {
                     screenshot_tool(app, &arguments).await
                 }
-            } else if requires_approval(&call.function.name) {
+            // A plugin tool is foreign code in the same sense `bash` is: it runs a program the
+            // app did not write. It therefore takes the same road through the approval gate,
+            // and a name that looks like a plugin tool is gated even when no plugin is enabled.
+            } else if requires_approval(&call.function.name)
+                || crate::plugins::is_plugin_tool(&call.function.name)
+            {
                 let session_allowed =
                     config.permission == "ask" && has_session_grant(app, session_id);
                 let dangerous = is_dangerous_command(&call.function.name, &arguments);
@@ -3232,10 +3279,19 @@ async fn run_turn(
                             skills_root: ctx.skills_root.clone(),
                             command_policy: ctx.command_policy.clone(),
                             allowed_commands: ctx.allowed_commands.clone(),
-                        command_dirs: ctx.command_dirs.clone(),
+                            command_dirs: ctx.command_dirs.clone(),
                             workspace_only: ctx.workspace_only,
                         };
-                        tools::execute(&call.function.name, &arguments, &approved, &mut todos).await
+                        dispatch_tool(
+                            app,
+                            config,
+                            &workspace,
+                            &call.function.name,
+                            &arguments,
+                            &approved,
+                            &mut todos,
+                        )
+                        .await
                     } else {
                         tools::ToolOutcome::err(
                             "permission denied by the user; do not retry this action without a new instruction",
@@ -3251,9 +3307,27 @@ async fn run_turn(
                         command_dirs: ctx.command_dirs.clone(),
                         workspace_only: ctx.workspace_only,
                     };
-                    tools::execute(&call.function.name, &arguments, &approved, &mut todos).await
+                    dispatch_tool(
+                        app,
+                        config,
+                        &workspace,
+                        &call.function.name,
+                        &arguments,
+                        &approved,
+                        &mut todos,
+                    )
+                    .await
                 } else {
-                    tools::execute(&call.function.name, &arguments, &ctx, &mut todos).await
+                    dispatch_tool(
+                        app,
+                        config,
+                        &workspace,
+                        &call.function.name,
+                        &arguments,
+                        &ctx,
+                        &mut todos,
+                    )
+                    .await
                 }
             } else {
                 tools::execute(&call.function.name, &arguments, &ctx, &mut todos).await
