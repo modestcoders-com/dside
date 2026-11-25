@@ -77,7 +77,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "read",
-                "description": "Read a text file. Returns lines prefixed with their 1-based line number. Use offset/limit for large files.",
+                "description": "Read a text file. Every line comes back prefixed with its 1-based number. Default is the first 2000 lines; pass offset/limit to read the rest — read the part you need instead of assuming what the rest says. Output stops at 30k characters and says how many lines remain. A binary or non-UTF-8 file fails with the OS error; an empty file and an offset past the end each say so. Example: {\"path\":\"src/main.rs\",\"offset\":120,\"limit\":80}. Prefer this to `bash cat` even where the shell would work: here you get line numbers and the workspace-only rule.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -93,7 +93,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "write",
-                "description": "Write a file, creating parent directories and overwriting existing content.",
+                "description": "Write a whole file, creating missing parent directories. Use it for a new file; for a change inside an existing file use `edit`, so the rest of the file cannot be lost. With workspace-only on (the default) a path outside the workspace is refused. The answer reports the bytes written — that report, not the intent, is the confirmation. Example: {\"path\":\"docs/notes.md\",\"content\":\"# Notes\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -108,7 +108,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "edit",
-                "description": "Replace an exact string in a file. old_string must be unique unless replace_all is true.",
+                "description": "Replace an exact string in an existing file. `old_string` must match character for character, indentation included, and must occur exactly once unless `replace_all` is true. Zero matches and several matches are both refused with the count — add surrounding context to make it unique. Prefer this over `write` for existing files: only the matched text changes. Example: {\"path\":\"src/app.ts\",\"old_string\":\"const port = 3000\",\"new_string\":\"const port = 8080\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -125,7 +125,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "bash",
-                "description": "Run a shell command with sh -c in the workspace directory. Returns exit code, stdout and stderr.",
+                "description": "Run a command with `sh -c` in the workspace; returns exit code, stdout and stderr, and `is_error` is true when the exit code is non-zero. Timeout defaults to 120 s with a ceiling of 1800 s — give a cold build several minutes in `timeout_ms` rather than guessing low and being cut off. Under command policy `allowlist` every segment of a pipeline must start with an allowed program name: no paths, no `>` to a file, no backticks or `$(...)`; `|` and `2>&1` are fine. Blocked in read mode and in everyday mode, and in Ask mode every call is approved first. Output is capped at 30k characters and says when it truncated. Example: {\"command\":\"cargo test --lib 2>&1 | tail -20\",\"timeout_ms\":600000}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -140,7 +140,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "glob",
-                "description": "Find files by glob pattern, e.g. \"src/**/*.ts\".",
+                "description": "Find files by glob pattern, relative to the workspace unless `path` names another directory. Walks at most 8 levels deep and skips node_modules, .git, target, dist, .cache, __pycache__, .venv and venv. Use it to find files by name or extension; use `grep` to find them by their contents. Example: {\"pattern\":\"src/**/*.vue\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -155,7 +155,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "grep",
-                "description": "Search file contents with a regular expression. Returns path:line: text.",
+                "description": "Search file contents with a Rust regular expression; each hit comes back as `path:line: text`. `path` may be a file or a directory (default: the workspace), `include` narrows to a name suffix such as `.ts`. At most 300 hits, 8 levels deep, skipping node_modules, .git, target and the other build directories. \"(no matches)\" and \"path does not exist\" are different answers — do not read the first as the second. Example: {\"pattern\":\"TODO\",\"include\":\".ts\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -171,7 +171,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "todowrite",
-                "description": "Store the current task list so long tasks keep a visible plan.",
+                "description": "Replace the task list shown in the progress panel. Pass the whole list every time — it overwrites, it does not append. Each item has `content`, a `status` (`pending`, `in_progress` or `completed`) and a priority. Use it for work of more than about three steps so the user can see where you are, and keep one item in progress at a time. Example: {\"todos\":[{\"content\":\"Read the schema\",\"status\":\"completed\",\"priority\":\"high\"},{\"content\":\"Add the column\",\"status\":\"in_progress\",\"priority\":\"high\"}]}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -216,7 +216,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "recall",
-                "description": "Search your long-term memory and earlier conversations for a word or phrase. Use it when the user refers to something from a previous session, or when a stored note might answer the question. Read-only; it does not change anything.",
+                "description": "Search your own long-term memory and earlier conversations for a word or phrase. Use it when the user refers to something from before, or when a stored note might answer the question — not to re-read the current conversation, which you already have. Up to `limit` hits (1–20, default 8). Read-only. Example: {\"query\":\"deployment target\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -231,7 +231,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "skill",
-                "description": "Available skills: reusable instructions for a class of task (e.g. landing pages, PDFs). Call with action 'list' to see what is installed, or with 'name' to load a skill and follow it.",
+                "description": "Reusable instructions for a class of task, kept as SKILL.md files. `list` returns what is installed with its one-line description; `load` returns the full text of one, capped at 30k characters. Load a skill when the task matches its description — do not invent a procedure a skill already spells out. Example: {\"action\":\"load\",\"name\":\"landing-page\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -246,7 +246,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "web_fetch",
-                "description": "Fetch a URL over HTTP(S) and return its readable text (HTML tags stripped). Use it to read documentation or a page the user linked.",
+                "description": "Fetch a URL over http(s) and return its readable text: HTML tags, script and style blocks removed. 30-second timeout, output capped at 30k characters, and the HTTP status is the first line. For a page whose layout matters, or one you must click or fill, use `preview` or `browser_read` instead. Example: {\"url\":\"https://example.com/docs\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -260,7 +260,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "code_review",
-                "description": "Collect the current git diff (optionally staged, optionally a path) and return it for review: stat plus patch.",
+                "description": "Return the current `git diff` for reading: file stat plus the patch, optionally only staged changes and optionally limited to one path. Use it to see what changed before you describe, verify or commit it. Example: {\"staged\":true}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -274,7 +274,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "ask_user",
-                "description": "Ask the user a question and PAUSE the turn until they answer. Use this instead of asking in prose whenever a decision materially changes the outcome and you cannot infer it — the question appears above the composer and the run waits for the reply. Provide short options when the answer is a choice.",
+                "description": "Ask the user one question and pause the turn until they answer. Use it instead of asking in prose whenever the answer changes what you do next and you cannot infer it. The question appears above the composer, your options become buttons, and the turn waits — the wait is a setting, five minutes by default — and ends if nobody answers. Example: {\"question\":\"Which package should the build produce?\",\"options\":[\"AppImage\",\"deb\"]}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -293,7 +293,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "task",
-                "description": "Run a self-contained sub-task in a fresh context and get only its final answer back. Use it for work that would otherwise flood your own context (broad searches, long reading, isolated research). The sub-agent cannot see this conversation, so its prompt must be complete on its own. Use sparingly: each run costs its own tokens.",
+                "description": "Hand a self-contained job to a sub-agent that sees none of this conversation, and get only its final answer. Use it for work that would flood your own context — broad searches, long reading, independent research. The prompt must stand alone: say what to do, where to look and what to return. The sub-agent has the file, search, shell and web tools, but cannot ask anyone anything and cannot take screenshots. Each run costs its own model call. Example: {\"prompt\":\"List every place that reads the settings table, with file:line.\",\"description\":\"Find settings readers\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -342,7 +342,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "name_ideas",
-                "description": "Look up names by what they mean, from a pool of about 950. Use it when you want to choose your own name and nothing comes to mind — or when you want to see what a name actually means before taking it.",
+                "description": "Look up names by meaning in a pool of about 950, optionally filtered by language or culture. Use it when you want to choose a name and nothing fits, or to check what a name really means before taking it. Example: {\"meaning\":\"light\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -356,7 +356,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "choose_name",
-                "description": "Choose the name you want to be called by. You are currently going by the placeholder 'Seeky'. This is a one-time decision and cannot be changed afterwards, so do it when you have a name that actually fits this person and the way you two work — not on the first turn. Say it in the answer as well: the user sees it immediately. Give the reason too: it is stored with the date in your memory, so a later thread does not have to guess why you are called that.",
+                "description": "Choose the name you are called by. Once and permanent — so wait until you know this person well enough for the name to mean something, not on the first turn and not on a whim. Give the reason: it is stored with the date in your memory. Say the name plainly in your answer too. You currently go by the placeholder \"Seeky\". Example: {\"name\":\"Nova\",\"reason\":\"One sentence about this person and how we work.\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -371,7 +371,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "screenshot",
-                "description": "Capture the user's current screen and look at it. Use it when the user asks what is on screen, when a visual UI problem needs the actual pixels, or when words are insufficient. Without `window` it captures the whole desktop; pass a browser window id (see browser_windows) to get only that window, cut out of the desktop — the answer says whether the crop worked. In ask mode the user is prompted first.",
+                "description": "Capture the screen and look at the pixels. Without `window` it is the whole desktop; with a browser window id (see `browser_windows`) it is that window cut out of the desktop, and the answer says whether the crop worked. Use it when the user asks what is on screen, or when the problem is visual and layout is not enough — `preview` is cheaper because it returns boxes and text. In Ask mode the user is prompted first. Example: {\"window\":\"browser-1\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -384,7 +384,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "logs",
-                "description": "Read the most recent application log lines. Use it when something failed silently, when the user reports an error, or when you need to know what the app itself is doing. The lines are local; do not repeat secrets or long stack traces.",
+                "description": "Read the app's own recent log lines — the same ring the Diagnostics page shows. Use it when something failed silently, when the user reports an error, or when you need to know what the app did rather than what it said. `limit` defaults to 100, maximum 400. Do not repeat secrets or whole stack traces from it. Example: {\"limit\":50}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -449,7 +449,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "settings",
-                "description": "Read the active configuration of this turn: workspace, permission stage, browser control, follow mode, workspace-only, command policy, allowed commands, model and reasoning effort. Use it before guessing why a tool is unavailable — the values here are the ones this turn actually runs with, which can differ from a setting the user just changed.",
+                "description": "Report the configuration this turn actually runs with: workspace, permission stage, browser control, follow mode, workspace-only, command policy and allowed commands, model and reasoning effort. Use it before guessing why a tool is unavailable — a setting the user just changed may not have reached this turn. Takes no arguments.",
                 "parameters": {
                     "type": "object",
                     "properties": {}
@@ -1858,6 +1858,23 @@ mod tests {
         names.sort();
         names.dedup();
         assert_eq!(names.len(), count, "duplicate tool name in definitions()");
+    }
+
+    /// The description is half of what the model knows about a tool, and it used to be one
+    /// sentence for `read` and `write`. A one-liner is not a schema problem, so no other test
+    /// would notice it coming back; this one does.
+    #[test]
+    fn every_tool_description_is_a_real_description() {
+        for definition in definitions() {
+            let name = definition["function"]["name"].as_str().unwrap_or("(unnamed)");
+            let description = definition["function"]["description"]
+                .as_str()
+                .unwrap_or("");
+            assert!(
+                description.chars().count() >= 60,
+                "{name}: the description is a single sentence ({description:?})"
+            );
+        }
     }
 
     /// The dead end from the field: pointing `grep` at a file said "is not a directory". A file

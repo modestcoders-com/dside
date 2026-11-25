@@ -6070,3 +6070,30 @@ eines benutzt — dafür braucht es einen Modellaufruf.
 
 `cargo test --lib` **132** / 14 ignoriert, `vue-tsc` grün, i18n 555 Schlüssel, `check:private`
 sauber. Nichts committet, kein Release-Paket gebaut.
+
+## 137. Die Werkzeugbeschreibungen sind die andere Hälfte des Prompts (2026-11-25)
+
+Der Begleiter kennt seine Werkzeuge nur durch zwei Texte: die Rolle (Persona) und die
+Beschreibung, die zu jedem Werkzeug mitgeschickt wird. Die zweite war bei den meisten Werkzeugen
+ein Satz — `read`: „Read a text file." Ein Modell, das nicht weiß, wo die Grenzen liegen, probiert
+sie aus und kostet Züge.
+
+Achtzehn Beschreibungen neu geschrieben, jede gegen den Code geprüft: `read` (2000 Zeilen
+Vorgabe, 30 000 Zeichen Deckel, was ein Binärfile tut), `write` und `edit` (wann welches, dass
+`old_string` eindeutig sein muss), `bash` (Allowlist segmentweise, kein Pfad, kein `>` auf eine
+Datei, `|` und `2>&1` erlaubt, 120 s Vorgabe / 1800 s Grenze, im Lese- und Alltagsmodus gesperrt),
+`glob` und `grep` (Tiefe 8, übersprungene Verzeichnisse, 300 Treffer), `todowrite` (überschreibt,
+verschiedene Status), `recall`, `skill`, `web_fetch`, `code_review`, `ask_user`, `task`,
+`name_ideas`, `choose_name`, `screenshot`, `logs`, `settings`. Jede nennt jetzt zusätzlich ein
+Beispiel und die Grenze, die im Code steht.
+
+Nicht angefasst: `memory`, `verify`, `schedule`, `preview`, `browser_read`, `browser_fill`,
+`browser_click`, `browser_windows` — die waren bereits ausführlich und nannten ihre Grenzen.
+
+Ein Test hält das fest: keine Werkzeugbeschreibung unter 60 Zeichen. Ein einsätziger Text ist kein
+Schemafehler, also hätte ihn sonst kein Test bemerkt.
+
+**Ungemessen:** ob der Begleiter dadurch besser arbeitet. Dafür braucht es einen echten
+Modellzug; dieser Abschnitt beschreibt nur, was der Text jetzt sagt.
+
+`cargo test --lib` **133** / 14 ignoriert. Kein Verhalten geändert, kein Schema, kein Werkzeug.
