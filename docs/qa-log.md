@@ -55,3 +55,34 @@ archivierte Sitzungen überhaupt in Treffern erscheinen (dann: nur lesen, oder b
 reaktivieren), oder gar nicht (dann verliert das Archiv seinen Sinn). Außerdem ist es reine
 Frontend-Logik, und dieses Projekt hat keinen Testläufer für das Frontend; ein Rust-Test würde
 die Stelle nicht abdecken.
+
+## 2026-11-26 00:00 — Punkt 3: Erinnerungen anlegen, stilllegen, wiederherstellen — bestanden
+
+Ausgangslage in der Kopie: sieben aktive Einträge, keiner stillgelegt.
+
+- **Anlegen** über das Formular im Panel (Titel + Text): Der Zähler zeigte `14/120` passend zum
+  Titel, „Hinzufügen" wurde aktiv, der Eintrag erschien sofort in der Liste, und das Formular leerte
+  sich. In der Datenbank: `id 11, origin = user, class = work, retired_at IS NULL`.
+- **Stilllegen** über den Knopf am Eintrag (Titel „Stilllegen"): Der Eintrag verschwand aus der
+  aktiven Liste und stand danach unter „Stillgelegt (1)"; `retired_at` ist gesetzt.
+- **Wiederherstellen** nach Aufklappen der Rubrik (Knopf „Zurückholen"): Der Eintrag war wieder in
+  der aktiven Liste, die Rubrik verschwand (`Stillgelegt (0)` heißt: die Überschrift wird nicht mehr
+  gerendert, weil `v-if="visibleRetired.length"`), und `retired_at` ist wieder `NULL`.
+- **Panel-Wechsel** (Erinnerungen → Richtlinien → Erinnerungen): Der Eintrag ist weiterhin da, keine
+  stillgelegten. Das Panel lädt beim Einhängen neu aus der Datenbank (`onMounted → load`), es gibt
+  also keinen zweiten Zustand, der auseinanderlaufen könnte.
+- **Neustart der App** auf denselben Daten: Der Eintrag ist weiterhin aktiv und nicht stillgelegt.
+
+Dass ein stillgelegter Eintrag auch nicht mehr erinnert wird, deckt der Unit-Test
+`retiring_hides_a_memory_and_restoring_brings_it_back` ab: nach dem Stilllegen ist die aktive Liste
+leer, der Eintrag liegt in der stillgelegten Liste, `memory_report` zählt ihn nicht, und
+Wiederherstellen bringt ihn zurück.
+
+Kein Fehler gefunden, nichts geändert.
+
+Aufräum-Notiz für mich selbst: Nach `dbus-run-session`-Läufen bleiben Portal-Prozesse
+(`xdg-desktop-portal`, `-kde`, `ksecretd`, `dbus-daemon`) mit dem Test-Datenverzeichnis in der
+Umgebung zurück und legen `data/kwalletd` immer wieder an — das Verzeichnis lässt sich erst löschen,
+wenn diese Prozesse beendet sind. `pkill -f` traf dabei auch die eigene Shell, weil deren
+Befehlszeile den Suchbegriff enthielt; richtig ist, die PIDs über `XDG_DATA_HOME` im
+`/proc/<pid>/environ` zu bestimmen und einzeln zu beenden.
