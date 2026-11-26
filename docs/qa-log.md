@@ -225,3 +225,39 @@ Watcher läuft. Nach dem Fix sind alle drei Modi erneut geprüft, unverändert r
 dem Webview nicht umschalten, und das `MediaQueryList`-Objekt, das die App hält, ist vom Test nicht
 erreichbar (`window.matchMedia(…)` liefert jedes Mal ein neues Objekt — geprüft). Der Fix ist also
 durch Lesen und den Typencheck belegt, nicht durch einen Lauf.
+
+## 2026-11-26 06:00 — Punkt 9: Alle sechs Sprachen — bestanden
+
+Kopie der Datenbank. Sprachwähler auf der ersten Einstellungsseite (Deutsch, English, 简体中文,
+Русский, Français, Español).
+
+Für jede der sechs Sprachen: umgeschaltet, den Wechsel **bestätigt** (`document.documentElement.lang`
+und der Wert im Wähler müssen der Sprache entsprechen, sonst bricht die Prüfung ab), dann alle zehn
+Einstellungsseiten geöffnet und den sichtbaren Text auf rohe Schlüssel geprüft. Ergebnis: zehn
+Seiten je Sprache, **kein** roher Schlüssel. Die Beschriftungen sind durchgehend übersetzt, auch
+die Navigation (z. B. `常规 · 键盘快捷键 · 记忆 · 伙伴 · 账户与模型 · 策略 · 插件 · 诊断 · 关于`).
+
+In der Hauptansicht (zh-Hans) ebenfalls sauber: Werkzeugleisten-Titel (`收起侧边栏`,
+`切换会话`, `在浏览器中打开` …) und der Composer-Platzhalter (`输入消息… (/ 为命令)`).
+
+Die Sprache überlebt einen Neustart. Sie liegt in `localStorage` (`ds-ide.locale`), nicht in der
+Einstellungstabelle — beobachtet, nicht bemängelt: sie gehört damit zur Installation, nicht zur
+Datenbank, und wird nicht mit einer kopierten Datenbank auf einen anderen Rechner getragen.
+
+**Zwei Dinge, die ich dabei gelernt habe, und die in den bisherigen Läufen falsch hätten laufen
+können:**
+
+1. **Ein Fund war keiner.** Der erste Durchlauf meldete den rohen Schlüssel
+   `settings.general.modeEverydayTitle`. Er stand im **Text einer gespeicherten Erinnerung** — ein
+   Eintrag, der über unübersetzte Schlüssel spricht. Gespeicherter Inhalt ist Datenmaterial, keine
+   Oberfläche; ein Scan muss ihn ausschließen.
+2. **Die Sprachumschaltung war zwischenzeitlich gar nicht geprüft.** In einem Zwischenlauf war der
+   `select` nicht der Sprachwähler (die Einstellungsseite stand auf einem anderen Panel), die
+   Sprache blieb Russisch, und „kein roher Schlüssel" war damit wertlos. Erst nach dem Zurückgehen
+   auf die erste Seite und einer Abbruchbedingung (Wechsel muss ankommen) ist der Nachweis echt.
+
+Zur Behauptung in jener Erinnerung („4 deutsche Reste in zh-Hans, darunter
+`settings.general.modeEverydayTitle`"): heute nicht mehr wahr. `check:i18n` meldet keine Warnung,
+`modeEverydayTitle` ist `用于日常工作`, und eine Suche nach Werten ohne chinesische Zeichen mit drei
+oder mehr lateinischen Wörtern findet im chinesischen Katalog nichts. Die Notiz ist veraltet — ein
+Fall für den Gedächtnis-Check, keine Code-Änderung.
