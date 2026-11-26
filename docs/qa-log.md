@@ -192,3 +192,9 @@ Projektbasis) mit demselben Knopf-Titel „Ordner wählen". Ich hatte zuerst die
 und mich über „der Wechsel wirkt nicht" gewundert — die Basis ist bewusst nur eine Listenquelle. Der
 Arbeitsordner-Dialog ist der, dessen Knopf einen Schwester-Knopf „Ordner neu laden und den
 geöffneten Thread daran binden" hat.
+
+Aufräum-Notiz zu diesem Lauf: Zwei leere Verzeichnisse aus den Läufen von 22:00 und 23:00
+(`/tmp/…/data/kwalletd`) kommen wieder, sobald man sie löscht, obwohl kein Prozess sie offen hält
+(alle `/proc/*/fd` durchsucht). Sie sind 0 Byte groß und verschwinden mit dem nächsten Neustart des
+Rechners; seine eigene `kwalletd`-Instanz ist es nicht (deren Arbeitsverzeichnis ist sein
+Home-Verzeichnis). Ich lasse sie stehen, statt an seinen Portal-Diensten zu drehen.
