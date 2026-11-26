@@ -261,3 +261,44 @@ Zur Behauptung in jener Erinnerung („4 deutsche Reste in zh-Hans, darunter
 `modeEverydayTitle` ist `用于日常工作`, und eine Suche nach Werten ohne chinesische Zeichen mit drei
 oder mehr lateinischen Wörtern findet im chinesischen Katalog nichts. Die Notiz ist veraltet — ein
 Fall für den Gedächtnis-Check, keine Code-Änderung.
+
+## 2026-11-26 07:00 — Punkt 10: Turn-Diff und Rücknahme — bestanden
+
+Ohne Modellzug gibt es keinen echten Turn. Für diesen Punkt habe ich deshalb **genau die Zeilen
+eingefügt, die ein Zug schreibt** (`file_versions` mit `turn_id`, `origin = edit` bzw. `write`) und
+den Zustand danach auf der Platte hergestellt: eine geänderte und eine neu angelegte Datei, dazu
+eine unberührte als Kontrolle.
+
+- **Diff**: `turn_diff` liefert `turnId`, `canUndo: true` und beide Dateien mit dem Stand davor und
+  danach (`edited.txt`: „line two" → „line two changed by the turn"; `created.txt`: leer und
+  `existedBefore = false` → „brand new file"). Das Panel „Änderungen" zeigt beide mit „neu" bzw.
+  „Bearbeiten" und den Knopf „Zug zurücknehmen".
+- **Rücknahme**: ein Klick — `edited.txt` steht wieder auf „line two", `created.txt` ist **entfernt**,
+  `untouched.txt` unberührt. Das Panel meldet danach „Dieser Zug ist bereits zurückgenommen",
+  `canUndo` ist `false`.
+- **Die Rücknahme ist selbst rückholbar**: sie schreibt eine eigene Sicherung (`origin = revert`,
+  id 1175). Deren Inhalt ist der Stand nach dem Zug; ein `file_revert` darauf stellt ihn wieder her
+  („line two changed by the turn"). Eine Rücknahme, die sich nicht zurücknehmen lässt, wäre keine.
+- **Schutzregel**: Nach einer späteren Änderung an einer Datei des Zuges verweigert `turn_revert`
+  mit `…/created.txt changed after this turn; use the file history` — statt stillschweigend fremde
+  Arbeit zu überschreiben. Der Wortlaut der Sicherung bestätigt die Absicht aus dem Code
+  („der aktuelle Stand wird gesichert").
+
+Kein Fehler gefunden, nichts geändert.
+
+Zwei Anmerkungen für den nächsten Leser: Der Diff entsteht aus dem **letzten** Turn der Sitzung
+(`latest_turn_id`), nicht aus einem wählbaren. Und die Kontrolle über die Oberfläche braucht ein
+Panel, das nur existiert, wenn es Dateiänderungen gibt — ohne die eingefügten Zeilen wäre der
+Knopf gar nicht da.
+
+---
+
+## Alle zehn Punkte geprüft — 2026-11-26 07:00
+
+Sitzungen, Suche, Erinnerungen, Git-Panel, Vorschau, Terminal, Projekte, Erscheinungsbild,
+sechs Sprachen, Turn-Diff und Rücknahme. Sieben ohne Befund, drei mit einem Fund: ein fehlender
+`application/pdf`-Typ (behoben), ein System-Theme, dem die App nicht folgte (behoben), und ein
+Suchtreffer in einem archivierten Thread, der ohne Titel öffnet (offen, `TODO.md`).
+
+Was diese Läufe **nicht** zeigen: den Begleiter selbst. Kein Modellaufruf, also kein Urteil über
+die Qualität seiner Arbeit — dafür gibt es `docs/companion-checks.md` und den Nutzer.
