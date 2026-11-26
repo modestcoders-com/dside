@@ -318,6 +318,9 @@ fn mime_for(path: &Path) -> &'static str {
         "woff2" => "font/woff2",
         "ttf" => "font/ttf",
         "otf" => "font/otf",
+        // A page that embeds a PDF (`<embed src="doc.pdf">`) renders it in place only when the
+        // type says what it is; `application/octet-stream` makes the browser download instead.
+        "pdf" => "application/pdf",
         "txt" | "md" => "text/plain; charset=utf-8",
         _ => "application/octet-stream",
     }
@@ -369,6 +372,9 @@ mod tests {
         assert!(mime_for(Path::new("a.html")).starts_with("text/html"));
         assert!(mime_for(Path::new("a.css")).starts_with("text/css"));
         assert_eq!(mime_for(Path::new("a.bin")), "application/octet-stream");
+        // Without this an embedded PDF is downloaded instead of shown.
+        assert_eq!(mime_for(Path::new("doc.pdf")), "application/pdf");
+        assert_eq!(mime_for(Path::new("DOC.PDF")), "application/pdf");
     }
 
     #[test]

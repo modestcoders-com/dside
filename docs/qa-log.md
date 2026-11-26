@@ -114,3 +114,31 @@ Aufräum-Notiz: Beim Wechsel zwischen Testläufen überlebte eine DSIDE-Instanz 
 den Brücken-Port; die nächste Instanz konnte ihn nicht binden (`test bridge: cannot bind … os error
 98`) und ich habe dann die *alte* Instanz abgefragt — das sah nach einem falschen Workspace aus, war
 aber mein Testfehler. Prüfregel: vor jedem Start `ss -tlnp | grep <port>` und `pgrep -x DSIDE`.
+
+## 2026-11-26 02:00 — Punkt 5: Vorschau (CSS, Bild, PDF, fehlendes Asset) — bestanden, mit einem Fix
+
+Testseite im isolierten Workspace: `index.html` mit relativem Stylesheet, einem PNG, einem
+verlinkten PDF **und** einem absoluten Skriptpfad `/js/app.js`, der bewusst ins Leere zeigt.
+Vorschau-Server über den echten Befehl `preview_start` gestartet.
+
+- `/` und `/index.html` → `200 text/html`, 330 Bytes.
+- `/assets/style.css` → `200 text/css`, 104 Bytes; mit `/usr/bin/cmp` byte-gleich mit der Datei.
+- `/assets/logo.png` → `200 image/png`, 77 Bytes; byte-gleich.
+- `/doc.pdf` → `200`, 193 Bytes; byte-gleich.
+- `/js/app.js` → `404`. Die Seite fragt es an, der Server hat es nicht — genau der Fall, für den
+  die Warnung gebaut wurde.
+- Pfad-Ausbruch (`/../../etc/passwd` und die kodierte Form) → `404`, nichts wird ausgeliefert.
+- Im echten Browser-Fenster gelesen: `title "QA-Vorschau"`, `loading: false`, Text „Vorschau-Test
+  PDF", und die Asset-Liste enthält **genau** die drei Anfragen der Seite, inklusive des fehlenden
+  `/js/app.js` (Typ `script`). `missing_assets` daraus ist die Liste, die in der Warnung steht; der
+  Unit-Test `assets_beyond_the_root_are_reported_as_missing` deckt den Wortlaut-Pfad ab.
+
+**Fund und behoben:** `/doc.pdf` kam als `application/octet-stream` — `mime_for` kannte `pdf` nicht.
+Eine Seite, die ein PDF einbettet (`<embed src="doc.pdf">`), wird dadurch heruntergeladen statt
+angezeigt. Ein Zweig `"pdf" => "application/pdf"` ergänzt, der Test `the_mime_keeps_pages_and_styles_typed`
+prüft jetzt auch `doc.pdf` und `DOC.PDF` (Großschreibung), im neu gebauten Paket liefert der Server
+`application/pdf` mit unveränderten 193 Bytes.
+
+Was dieser Lauf **nicht** zeigt: den fertigen Warntext, den der Begleiter im Werkzeugergebnis liest.
+Der entsteht im `preview`-Werkzeug, und das braucht einen Modellzug. Belegt sind die Zutaten: die
+angefragten Pfade, die fehlende Datei, ihr 404 und die Funktion, die sie benennt.
