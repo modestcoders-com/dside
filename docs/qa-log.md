@@ -160,3 +160,35 @@ Debug-Build, Kopie der Datenbank, eigener Arbeitsordner mit einer Datei `marker.
   `SIGTERM` beendet — der `sleep`-Prozess war mitgegangen (keine Waise übrig).
 
 Kein Fehler gefunden, nichts geändert.
+
+## 2026-11-26 04:00 — Punkt 7: Projektwechsel und relative Pfade — bestanden
+
+Zwei Projektordner unter einer Projektbasis, Kopie der Datenbank, App auf Projekt A gestartet.
+
+- **Projektwechsel über die Seitenleiste**: Projekt B gewählt → Arbeitsordner der App wechselt auf
+  B (`settings.workspace` in der Datenbank), und weil es in B noch keinen Thread gab, legt die App
+  einen neuen dort an. Die vier alten Threads bleiben in A. Das ist die dokumentierte Absicht
+  („ein Projektwechsel öffnet den neuesten Thread des Projekts, oder startet einen").
+- **Aktiver Thread wird neu gebunden**: Über Einstellungen → Allgemein → Aktives Projekt auf A
+  umgestellt, während der offene Thread in B lag. Danach: `settings.workspace` = A **und** die
+  Sitzungszeile des offenen Threads = A. Beides zusammen, wie gefordert.
+- **Relativer Pfad in der Sitzung**: `workspace = '.'` in der aktiven Sitzung eingetragen, neu
+  gestartet. Logzeile: `ui: session <id>: replaced workspace "." with "<workspace>"`, danach steht
+  der absolute Pfad in der Datenbank. Der Thread wird repariert, nicht verworfen.
+- **Relativer Pfad in den Einstellungen**: `workspace = '.'` gespeichert, neu gestartet. Danach
+  steht dort der Ordner des offenen Threads (A) — ein Punkt aus den Einstellungen überlebt keinen
+  Start, und der offene Thread entscheidet, wie im Startcode kommentiert.
+
+**Beobachtung, die ich hier nicht messen kann (nach `TODO.md` unter „Found by QA"):**
+`samePath` in `src/lib/projects.ts` vergleicht Pfade ohne Rücksicht auf Groß-/Kleinschreibung, und
+`groupByProject` gruppiert nach dem rohen Pfad. Windows-Pfade sind aber nicht case-sensitiv; zwei
+Schreibweisen desselben Ordners (`C:\Users\…\Proj`, `c:\users\…\proj`) würden dort als zwei
+verschiedene Projekte gelten. Im selben Repo macht `plugins::path_key` es richtig (Kleinschreibung
+auf Windows) — zwei Konventionen nebeneinander. Auf Linux nicht prüfbar; deshalb als Beobachtung
+notiert, nicht als Befund.
+
+Testfehler meinerseits, der Zeit gekostet hat: Es gibt **zwei** Ordner-Dialoge (Arbeitsordner und
+Projektbasis) mit demselben Knopf-Titel „Ordner wählen". Ich hatte zuerst die Projektbasis geöffnet
+und mich über „der Wechsel wirkt nicht" gewundert — die Basis ist bewusst nur eine Listenquelle. Der
+Arbeitsordner-Dialog ist der, dessen Knopf einen Schwester-Knopf „Ordner neu laden und den
+geöffneten Thread daran binden" hat.

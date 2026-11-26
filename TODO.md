@@ -50,6 +50,12 @@ Not fixed, because each one is a decision rather than a slip. See `docs/qa-log.m
   where both are correct. The open question is what should happen: exclude archived threads from
   search (loses the main reason to archive instead of delete), show them read-only, or unarchive on
   open. Frontend-only, and this project has no frontend test runner — a Rust test would not cover it.
+- **Two conventions for comparing paths.** `samePath` in `src/lib/projects.ts` compares without
+  regard for case, and `groupByProject` groups by the raw path, while `plugins::path_key` on the
+  Rust side lowercases on Windows. Two spellings of the same folder (`C:\Users\…\Proj` vs
+  `c:\users\…\proj`) would therefore count as two projects in the rail and as one in the plugin
+  lookup. Not measured — it cannot happen on Linux. Worth one shared helper the next time either
+  side is touched; nothing observed is broken today.
 
 ## Done in 0.6.5 (published 2026-11-15)
 
