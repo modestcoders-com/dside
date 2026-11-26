@@ -6171,3 +6171,12 @@ der Arbeit. Dafür liegen die zehn Aufgaben bereit; der Vergleich braucht den Nu
 `cargo test --lib` **133** / 14 ignoriert, `vue-tsc` grün, i18n 555 Schlüssel, `check:private`
 sauber. AppImage lokal gebaut und gestartet; Version und Update-Zeiger im Bundle geprüft, die neuen
 Zeichenketten (`plugin__`, `application/pdf`) im Binary der entpackten AppDir gefunden.
+
+### Veröffentlicht
+`v0.6.8`, `latest`, 8 Assets (`.deb`, `.rpm`, AppImage, **AppImage.zsync**, linux-tar.gz, dmg,
+Windows-Zip, `.exe`). Alle fünf CI-Jobs (Prüfung, drei Plattformen, Anhängen) grün beim ersten
+Lauf. Am veröffentlichten Stand: die `.zsync` lädt mit HTTP 200 (310 812 Bytes), ihr `URL`-Header
+zeigt auf das AppImage, das mit HTTP 200 und 90 847 736 Bytes antwortet; `latest` ist `v0.6.8`.
+
+Mit dieser Version sollte die installierte 0.6.7 beim nächsten Start **„Update 0.6.8"** in der
+Titelleiste zeigen — und Shelly das AppImage anbieten.
