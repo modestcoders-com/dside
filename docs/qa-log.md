@@ -142,3 +142,21 @@ prüft jetzt auch `doc.pdf` und `DOC.PDF` (Großschreibung), im neu gebauten Pak
 Was dieser Lauf **nicht** zeigt: den fertigen Warntext, den der Begleiter im Werkzeugergebnis liest.
 Der entsteht im `preview`-Werkzeug, und das braucht einen Modellzug. Belegt sind die Zutaten: die
 angefragten Pfade, die fehlende Datei, ihr 404 und die Funktion, die sie benennt.
+
+## 2026-11-26 03:00 — Punkt 6: Terminal-Panel — bestanden
+
+Debug-Build, Kopie der Datenbank, eigener Arbeitsordner mit einer Datei `marker.txt`.
+
+- **Öffnen**: Panel erscheint, die Shell startet **im Arbeitsordner** — die Prompt-Zeile zeigt
+  `<workspace>`, ebenso die Statuszeile unter dem Terminal.
+- **Befehl und Ausgabe**: `cat marker.txt` → `hello-from-the-workspace`, wie die Datei.
+- **Echte Tastatureingabe**: Text über das Eingabefeld von xterm getippt (`echo typed-by-input`),
+  die Zeichen erscheinen in der Shell, Enter führt sie aus, Ausgabe `typed-by-input`.
+- **Prozessende**: `exit` beendet die Shell, das Panel schreibt „[Prozess beendet.]" und lässt den
+  bisherigen Verlauf stehen.
+- **Neu starten**: neue Shell, der Beendet-Hinweis verschwindet, `pwd` antwortet mit dem
+  Arbeitsordner — der Neustart erbt also das Arbeitsverzeichnis.
+- **Aufräumen beim Beenden der App**: `sleep 300` im Terminal gestartet, danach die App mit
+  `SIGTERM` beendet — der `sleep`-Prozess war mitgegangen (keine Waise übrig).
+
+Kein Fehler gefunden, nichts geändert.
