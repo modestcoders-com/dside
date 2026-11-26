@@ -377,12 +377,18 @@ function watchModeModel(): void {
 const media =
   typeof window === "undefined" ? null : window.matchMedia("(prefers-color-scheme: dark)");
 
-function prefersDark(): boolean {
-  return media?.matches ?? true;
-}
+/**
+ * The OS preference, held reactively.
+ *
+ * Reading `media.matches` directly inside the computed below looked right and was wrong: a
+ * computed caches on its *reactive* dependencies, and `matches` is a plain property. So in
+ * System mode the first answer was kept forever, the `change` listener re-applied that stale
+ * value, and switching the OS theme did nothing until the appearance was picked again.
+ */
+const prefersDark = ref(media?.matches ?? true);
 
 export const resolvedTheme = computed<"light" | "dark">(() =>
-  settings.appearance === "system" ? (prefersDark() ? "dark" : "light") : settings.appearance,
+  settings.appearance === "system" ? (prefersDark.value ? "dark" : "light") : settings.appearance,
 );
 
 function applyTheme(): void {
@@ -394,7 +400,11 @@ function applyTheme(): void {
 export function initTheme(): void {
   applyTheme();
   watch(resolvedTheme, applyTheme);
-  media?.addEventListener("change", applyTheme);
+  // Assigning the ref is what makes the computed above invalidate; the mutation itself is the
+  // signal, so `applyTheme` must not be called directly here.
+  media?.addEventListener("change", (event) => {
+    prefersDark.value = event.matches;
+  });
 }
 
 /**

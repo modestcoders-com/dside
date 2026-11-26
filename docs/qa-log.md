@@ -198,3 +198,30 @@ Aufräum-Notiz zu diesem Lauf: Zwei leere Verzeichnisse aus den Läufen von 22:0
 (alle `/proc/*/fd` durchsucht). Sie sind 0 Byte groß und verschwinden mit dem nächsten Neustart des
 Rechners; seine eigene `kwalletd`-Instanz ist es nicht (deren Arbeitsverzeichnis ist sein
 Home-Verzeichnis). Ich lasse sie stehen, statt an seinen Portal-Diensten zu drehen.
+
+## 2026-11-26 05:00 — Punkt 8: Erscheinungsbild und Schriftgröße ohne Neustart — bestanden, mit einem Fix
+
+Kopie der Datenbank, Ausgangslage dunkel / 13 px.
+
+- **Hell**: Klick auf die Karte → `data-theme="light"`, `color-scheme: light`, Hintergrund
+  `rgb(255,255,255)`, Text `rgb(45,45,45)` — sofort, ohne Neustart.
+- **Dunkel**: zurück auf `rgb(30,30,30)`, `color-scheme: dark`.
+- **System**: folgt der Systemeinstellung (hier dunkel, `prefers-color-scheme: dark` = true).
+- **Schriftgröße**: Regler auf 18 → `--reading-font-size: 18px`, die Absätze im Chat messen
+  tatsächlich 18 px; auf 11 → 11 px. Die Zahl daneben zeigt den Wert mit (`18 px`).
+- **Neustart**: `appearance = "system"`, `fontSize = 18` in der Datenbank, nach dem Start wieder
+  `data-theme="dark"` und `--reading-font-size: 18px`.
+
+**Fund und behoben (im Code gelesen, nicht am laufenden System gemessen):**
+`resolvedTheme` ist ein Vue-Computed und hing nur an `settings.appearance`. `prefersDark()` las
+`media.matches` — eine einfache, nicht reaktive Eigenschaft. Der `change`-Listener rief `applyTheme`
+auf, das den **zwischengespeicherten** Wert des Computeds zurücklas. Im System-Modus hätte die App
+also den Systemwechsel nicht mitbekommen: der erste Wert bleibt für immer stehen, bis jemand die
+Darstellung erneut auswählt. Behoben, indem die Systemeinstellung in einem `ref` liegt
+(`prefersDark`), das der Listener setzt — damit hängt das Computed an einer reaktiven Quelle und der
+Watcher läuft. Nach dem Fix sind alle drei Modi erneut geprüft, unverändert richtig.
+
+**Nicht gemessen:** der Systemwechsel im laufenden Betrieb. Das Betriebssystem-Theme lässt sich aus
+dem Webview nicht umschalten, und das `MediaQueryList`-Objekt, das die App hält, ist vom Test nicht
+erreichbar (`window.matchMedia(…)` liefert jedes Mal ein neues Objekt — geprüft). Der Fix ist also
+durch Lesen und den Typencheck belegt, nicht durch einen Lauf.
