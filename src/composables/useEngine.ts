@@ -21,6 +21,7 @@ import {
   endAssistantMessage,
   ensureAssistantMessage,
   failAssistantMessage,
+  MAX_ROUNDS_PER_TURN,
   messages,
   messagesBySession,
   selectSession,
@@ -193,7 +194,7 @@ export async function configureEngine(): Promise<void> {
       commandDirs: settings.commandDirs,
       workspaceOnly: settings.workspaceOnly,
       browserControl: settings.browserControl,
-      maxTurns: 24,
+      maxTurns: MAX_ROUNDS_PER_TURN,
       reasoningEffort: settings.reasoningEffort || null,
       // The countdown in the chat panel reads the same value, so the promise and the wait agree.
       askTimeoutSeconds: Math.max(30, Math.min(3600, Math.round(settings.askTimeoutMinutes * 60))),

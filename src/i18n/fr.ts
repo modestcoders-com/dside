@@ -322,6 +322,8 @@ export const fr: Messages = {
     failed: "Échec",
     done: "Terminé",
     cancelled: "annulé",
+    maxTurns:
+      "Le tour a atteint sa limite de {rounds} tours. Un tour peut faire autant d’appels au modèle — chaque étape d’outil en compte un. Ce qui a été fait reste ; « Réessayer » continue.",
     retry: "Réessayer",
   },
   model: {

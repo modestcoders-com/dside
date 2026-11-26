@@ -320,6 +320,8 @@ export const zhHans: Messages = {
     failed: "失败",
     done: "完成",
     cancelled: "已取消",
+    maxTurns:
+      "本轮已达到 {rounds} 轮的上限。一个回合内允许这么多次模型调用——每个工具步骤算作一次。此前完成的内容会保留;「重试」可继续。",
     retry: "重试",
   },
   model: {

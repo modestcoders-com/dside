@@ -323,6 +323,8 @@ export const de = {
     failed: "fehlgeschlagen",
     done: "fertig",
     cancelled: "abgebrochen",
+    maxTurns:
+      "Der Zug hat die Grenze von {rounds} Runden erreicht. Ein Zug darf so viele Modellaufrufe machen — jeder Werkzeugschritt zählt als einer. Was bis hier entstanden ist, bleibt erhalten; „Erneut versuchen“ setzt fort.",
     retry: "Erneut versuchen",
   },
   model: {

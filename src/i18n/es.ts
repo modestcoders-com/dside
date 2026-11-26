@@ -323,6 +323,8 @@ export const es: Messages = {
     failed: "fallido",
     done: "completado",
     cancelled: "cancelado",
+    maxTurns:
+      "El turno alcanzó su límite de {rounds} rondas. Un turno puede hacer esa cantidad de llamadas al modelo: cada paso de herramienta cuenta como una. Lo hecho hasta aquí se conserva; «Reintentar» continúa.",
     retry: "Reintentar",
   },
   model: {

@@ -6180,3 +6180,30 @@ zeigt auf das AppImage, das mit HTTP 200 und 90 847 736 Bytes antwortet; `latest
 
 Mit dieser Version sollte die installierte 0.6.7 beim nächsten Start **„Update 0.6.8"** in der
 Titelleiste zeigen — und Shelly das AppImage anbieten.
+
+## 141. `max_turns` stand als Wort in Rot im Chat (2026-11-26)
+
+Auf einem Bildschirmfoto aus dem Alltag: unter den Werkzeug-Chips stand `max_turns` in Rot, daneben
+„Erneut versuchen" — ohne einen Satz, der erklärt, was passiert ist.
+
+**Was `max_turns` ist.** Ein Zug ist nicht ein Modellaufruf. Das Modell fragt, ein Werkzeug
+antwortet, das Modell fragt wieder — jeder dieser Aufrufe ist eine *Runde*. Die Obergrenze liegt bei
+24 Rundungen je Zug (in der Oberfläche fest verdrahtet, im Kern auf 1–100 begrenzt) und existiert,
+damit ein Modell, das sich im Kreis dreht, keinen Zug endlos offen hält. Ist sie erreicht, endet der
+Zug mit dem Vermerk `stop_reason: max_turns`.
+
+**Der Fehler.** Die Oberfläche übernimmt einen `stop_reason` wörtlich als Fehlertext, außer bei
+`end_turn`, `abort`, `error` und `no_answer`. `max_turns` stand nicht in dieser Liste — also wurde
+das Kennzeichen selbst zur Meldung.
+
+**Die Änderung.** `max_turns` bekommt einen Satz in sechs Sprachen, der die Zahl nennt und sagt, was
+erhalten bleibt. Die Zahl kommt aus einer Konstante (`MAX_ROUNDS_PER_TURN`), die auch die
+Engine-Konfiguration speist — vorher stand die 24 an zwei Stellen.
+
+**Belegt, ohne Modellaufruf.** Ein lokaler Fake-Endpunkt auf 127.0.0.1 gab auf jede Anfrage einen
+Werkzeugaufruf zurück (`read` auf eine Notizdatei), sodass der Zug seine Runden wirklich aufbraucht:
+Der Server zählte 24 Runden plus einen Titelaufruf, und im Chat stand danach der deutsche Satz mit
+„24 Runden" statt des Kennzeichens. Die 401-Meldung im selben Fenster stammt aus einem
+Zwischenversuch und zeigt, dass ein echter Fehler weiterhin seinen eigenen Text behält.
+
+`.deb`, `.rpm` und AppImage wurden nicht neu gebaut; das Paket 0.6.8 enthält den alten Text.

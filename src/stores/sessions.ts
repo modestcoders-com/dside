@@ -1,6 +1,15 @@
 import { computed, reactive, ref, watch } from "vue";
+import { t } from "../i18n";
 import { saveUiState } from "../lib/uiState";
 import type { ChatMessage, MessagePart, Session, ToolActivity } from "../types";
+
+/**
+ * How many model calls one turn may make. A turn is not one request: a model that uses tools
+ * asks, the tool answers, the model asks again — every request is one round. This is the ceiling
+ * that stops a looping model from keeping a turn alive forever. It lives here because the message
+ * the user sees when the ceiling is hit has to name the same number.
+ */
+export const MAX_ROUNDS_PER_TURN = 24;
 
 export const sessions = ref<Session[]>([]);
 
@@ -144,11 +153,16 @@ export function endAssistantMessage(stopReason?: string): void {
     // replaced a real message ("LLM HTTP 400: …") with the word "error".
     // "no_answer" is terminal too: the engine has already explained in its own notice why the
     // turn stopped, and the marker must not replace that sentence with a token.
+    // "max_turns" is not a failure either — the turn simply used up its rounds — so it gets a
+    // sentence instead of the engine's identifier, which used to appear alone in red.
     if (
       stopReason &&
       !["end_turn", "abort", "error", "no_answer"].includes(stopReason)
     ) {
-      message.error = stopReason;
+      message.error =
+        stopReason === "max_turns"
+          ? t("engine.maxTurns", { rounds: MAX_ROUNDS_PER_TURN })
+          : stopReason;
     }
   }
   currentAssistantId = null;
