@@ -39,6 +39,18 @@ DeepSeek. Seven weeks without a handover is not a schedule, it is a pattern.
 - **Then decide: ship or stop.** If ship: 0.6.8 with the plugin round and the companion round, then
   the package for DeepSeek. If stop: a final README line and this file closed, tags untouched.
 
+## Done: the ten technical checks (2026-11-25/26)
+
+`docs/qa-log.md` holds the runs, one per hour, each in a debug build against a copy of the
+database: archiving and restoring a thread, history search, memories, the git panel, the preview
+servers's assets, the terminal, project switching, appearance and reading size, all six languages,
+and the turn diff with its undo. Seven found nothing; three found something — a missing
+`application/pdf` MIME type and a system theme the app did not follow were fixed, and one search
+behaviour is recorded below as a decision, not a defect.
+
+These check the machinery, not the companion. Whether it works *well* is still the open question,
+and it needs a model call and a judgement — see `docs/companion-checks.md`.
+
 ## Found by QA
 
 Not fixed, because each one is a decision rather than a slip. See `docs/qa-log.md` for the runs.
