@@ -6137,3 +6137,37 @@ keine verschlechtert, Geschmack ist und keine Verbesserung.
 **Was fehlt, ist der Lauf.** Die Liste macht einen Vergleich möglich; sie ersetzt ihn nicht. Zehn
 Aufgaben, jede in einem neuen Thread, gleiches Modell, gleiche Berechtigungsstufe — das braucht
 einen echten Modellzug und ein Urteil, das nur der Nutzer fällen kann.
+
+## 140. 0.6.8: Plugins, ein Verfahren für den Begleiter, zehn Prüfungen (2026-11-26)
+
+Die erste Version seit 0.6.7, und die erste, die vor allem **prüft** statt hinzuzufügen.
+
+### Was drin ist
+Plugins als Ordner mit Manifest, optionalen Notizen und optionalem Programm, das JSON-RPC über
+stdio spricht (§136); achtzehn Werkzeugbeschreibungen, die ihre Grenzen nennen (§137); ein
+Abschnitt „How you approach a task" in der Persona, ohne eine Tonregel anzufassen (§138); und
+`docs/companion-checks.md` mit zehn Aufgaben, an denen sich eine Änderung am Prompt messen lässt
+(§139).
+
+### Zehn technische Prüfungen, ein Nachtlauf pro Stunde
+`docs/qa-log.md` hält sie fest: Archivieren und Wiederherstellen, Suche im Verlauf, Erinnerungen,
+Git-Panel, Vorschau, Terminal, Projektwechsel, Erscheinungsbild und Schriftgröße, alle sechs
+Sprachen, Turn-Diff und Rücknahme. Sieben ohne Befund, drei mit einem Fund:
+
+- **`application/pdf` fehlte** in der MIME-Tabelle des Vorschau-Servers. Eine Seite, die ein PDF
+  einbettet, wurde es herunterladen statt anzuzeigen. Behoben, mit Test.
+- **Das System-Theme wurde nicht verfolgt.** `resolvedTheme` hing an einem Computed, das
+  `media.matches` las — eine nicht reaktive Eigenschaft. Im System-Modus blieb der erste Wert
+  stehen. Behoben, indem die Systemeinstellung in einem `ref` liegt. **Nicht am laufenden System
+  gemessen** — das lässt sich aus dem Webview nicht umschalten.
+- **Ein Suchtreffer in einem archivierten Thread öffnet ohne Titel** (Kopfzeile leer, kein aktiver
+  Eintrag in der Seitenleiste). Nicht behoben: was dabei geschehen soll, ist eine Entscheidung.
+  Steht in `TODO.md`.
+
+### Was dieser Lauf nicht gezeigt hat
+Den Begleiter. Kein Modellaufruf in der ganzen Runde — geprüft ist die Mechanik, nicht die Qualität
+der Arbeit. Dafür liegen die zehn Aufgaben bereit; der Vergleich braucht den Nutzer.
+
+`cargo test --lib` **133** / 14 ignoriert, `vue-tsc` grün, i18n 555 Schlüssel, `check:private`
+sauber. AppImage lokal gebaut und gestartet; Version und Update-Zeiger im Bundle geprüft, die neuen
+Zeichenketten (`plugin__`, `application/pdf`) im Binary der entpackten AppDir gefunden.
