@@ -86,3 +86,31 @@ Umgebung zurück und legen `data/kwalletd` immer wieder an — das Verzeichnis l
 wenn diese Prozesse beendet sind. `pkill -f` traf dabei auch die eigene Shell, weil deren
 Befehlszeile den Suchbegriff enthielt; richtig ist, die PIDs über `XDG_DATA_HOME` im
 `/proc/<pid>/environ` zu bestimmen und einzeln zu beenden.
+
+## 2026-11-26 01:00 — Punkt 4: Git-Panel (Status, Diff, Stage, Commit) — bestanden
+
+Wegwerf-Repository unter `/tmp` mit einem Commit, einer geänderten und einer unversionierten Datei.
+Die App lief mit einer Kopie der Datenbank in einem eigenen Datenverzeichnis.
+
+- **Status**: `GIT · 7de3911`, dann „NICHT GESTAGED 1 · M a.txt" und „UNVERSIONIERT 1 · ?? b.txt" —
+  dieselben zwei Einträge, die `git status --short` im Repository zeigt, samt Kurz-Hash des HEAD.
+- **Diff**: Auswahl von `a.txt` zeigte den vollständigen Patch (`-line two` / `+line two changed`);
+  Abgleich mit `git diff` stimmt zeichenweise.
+- **Stage**: „Alles stagen" verschob beide Einträge nach „GESTAGED 2", `git status` im Repository
+  zeigte `M  a.txt` und `A  b.txt`. Einzelnes „Stagen" und „Unstagen" funktionieren ebenfalls.
+- **Commit**: Nachricht im Feld `Commit-Nachricht`, „Committen" schrieb `[main 202910d] QA: commit
+  aus dem Panel, 2 files changed, 2 insertions(+), 1 deletion(-), create mode 100644 b.txt`, das
+  Feld leerte sich, der Arbeitsbaum war danach sauber — bestätigt mit `git log`/`git status`.
+- **Nach einer externen Änderung** zeigt ein erneutes Öffnen des Tabs den neuen Stand (`M a.txt`);
+  der Knopf „Aktualisieren" lädt ebenfalls neu.
+- **Ordner ohne Repository**: Der Ordner hatte kein `.git`; das Panel zeigte **„Kein
+  Git-Repository angelegt."** Die Backend-Meldung ist der Code `no_git_repository`, den die
+  Oberfläche in den übersetzten Satz übersetzt. Ein Unterordner eines Repositories verhält sich
+  genauso (kein Repository „von oben" erben).
+
+Kein Fehler gefunden, nichts geändert.
+
+Aufräum-Notiz: Beim Wechsel zwischen Testläufen überlebte eine DSIDE-Instanz das Beenden und hielt
+den Brücken-Port; die nächste Instanz konnte ihn nicht binden (`test bridge: cannot bind … os error
+98`) und ich habe dann die *alte* Instanz abgefragt — das sah nach einem falschen Workspace aus, war
+aber mein Testfehler. Prüfregel: vor jedem Start `ss -tlnp | grep <port>` und `pgrep -x DSIDE`.
