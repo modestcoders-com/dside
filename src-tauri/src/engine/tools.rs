@@ -77,7 +77,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "read",
-                "description": "Read a text file. Every line comes back prefixed with its 1-based number. Default is the first 2000 lines; pass offset/limit to read the rest — read the part you need instead of assuming what the rest says. Output stops at 30k characters and says how many lines remain. A binary or non-UTF-8 file fails with the OS error; an empty file and an offset past the end each say so. Example: {\"path\":\"src/main.rs\",\"offset\":120,\"limit\":80}. Prefer this to `bash cat` even where the shell would work: here you get line numbers and the workspace-only rule.",
+                "description": "Read a text file. Every line comes back prefixed with its 1-based number. Default is the first 2000 lines; pass offset/limit to read the rest — read the part you need instead of assuming what the rest says. Output stops at 30k characters and says how many lines remain. A binary or non-UTF-8 file fails with the OS error; an empty file and an offset past the end each say so. Example: {\"path\":\"src/main.rs\",\"offset\":120,\"limit\":80}. Prefer this to `bash cat` or `sed -n '10,40p'` even where the shell would work: here you get line numbers, the workspace-only rule, and no round spent on a shell — every `bash` call is one round of the turn's budget.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -125,7 +125,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "bash",
-                "description": "Run a command with `sh -c` in the workspace; returns exit code, stdout and stderr, and `is_error` is true when the exit code is non-zero. Timeout defaults to 120 s with a ceiling of 1800 s — give a cold build several minutes in `timeout_ms` rather than guessing low and being cut off. Under command policy `allowlist` every segment of a pipeline must start with an allowed program name: no paths, no `>` to a file, no backticks or `$(...)`; `|` and `2>&1` are fine. Blocked in read mode and in everyday mode, and in Ask mode every call is approved first. Output is capped at 30k characters and says when it truncated. Example: {\"command\":\"cargo test --lib 2>&1 | tail -20\",\"timeout_ms\":600000}.",
+                "description": "Run a command with `sh -c` in the workspace; returns exit code, stdout and stderr, and `is_error` is true when the exit code is non-zero. Timeout defaults to 120 s with a ceiling of 1800 s — give a cold build several minutes in `timeout_ms` rather than guessing low and being cut off. Under command policy `allowlist` every segment of a pipeline must start with an allowed program name: no paths, no `>` to a file, no backticks or `$(...)`; `|` and `2>&1` are fine. Blocked in read mode and in everyday mode, and in Ask mode every call is approved first. Output is capped at 30k characters and says when it truncated. The environment is already sanitised for children: `LD_LIBRARY_PATH`, `PYTHONHOME`, `PYTHONPATH` and `ARGV0` entries that point into a bundle are removed before the shell starts, so wrapping a command in `env -u PYTHONHOME -u PYTHONPATH` changes nothing. Read files with `read` and search with `grep` instead of `cat`, `sed -n` or shell `grep`: every shell call costs a whole round, and a round has a budget. Example: {\"command\":\"cargo test --lib 2>&1 | tail -20\",\"timeout_ms\":600000}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -155,7 +155,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "grep",
-                "description": "Search file contents with a Rust regular expression; each hit comes back as `path:line: text`. `path` may be a file or a directory (default: the workspace), `include` narrows to a name suffix such as `.ts`. At most 300 hits, 8 levels deep, skipping node_modules, .git, target and the other build directories. \"(no matches)\" and \"path does not exist\" are different answers — do not read the first as the second. Example: {\"pattern\":\"TODO\",\"include\":\".ts\"}.",
+                "description": "Search file contents with a Rust regular expression; each hit comes back as `path:line: text`. `path` may be a file or a directory (default: the workspace), `include` narrows to a name suffix such as `.ts`. At most 300 hits, 8 levels deep, skipping node_modules, .git, target and the other build directories. \"(no matches)\" and \"path does not exist\" are different answers — do not read the first as the second. Use this instead of a shell `grep`: one call searches the whole tree and costs one round, where `bash grep … | head` costs a round per invocation. Example: {\"pattern\":\"TODO\",\"include\":\".ts\"}.",
                 "parameters": {
                     "type": "object",
                     "properties": {

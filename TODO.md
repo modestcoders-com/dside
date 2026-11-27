@@ -53,11 +53,12 @@ and it needs a model call and a judgement — see `docs/companion-checks.md`.
 
 ## Found in daily use (2026-11-27)
 
-- **The companion works bash-heavy.** In the last 400 messages of a real thread: 261 `bash` calls
-  against 3 `grep`, 1 `glob` and 30 `edit`. Every shell call costs a round, where one `grep` could
-  have read several files in one. That is the likeliest reason a large task runs into the round
-  ceiling. Not fixed: it is a working pattern in the prompt and the tool descriptions, and changing
-  it needs the ten checks of `docs/companion-checks.md` to show whether it helped.
+- **The companion works bash-heavy — counted, and addressed in the descriptions.** In 285 `bash`
+  calls of a real thread: 121 were `env -u PYTHONHOME -u PYTHONPATH python3 -c …` (a wrapper for a
+  failure that no longer exists — the bundle sets neither variable), 45 shell `grep` and 42
+  `sed -n '…p'` were file reading that `read`/`grep` do in one round each; only 36 `cargo` and 23
+  `git` were the legitimate work. The descriptions of `bash`, `read` and `grep` now say both things.
+  Unmeasured: whether it changes the model's habit. `docs/companion-checks.md` is the yardstick.
 - **The round ceiling now has a checkpoint** (two budgets of 24 rounds and a final round without
   tools, see PROGRESS §142). Raising the number itself is not needed any more: the ceiling grants
   twice the work and ends with a hand-over instead of a cut.

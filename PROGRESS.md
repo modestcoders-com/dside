@@ -6265,3 +6265,29 @@ geraten.
 `0.6.9` als AppImage lokal gebaut und gestartet: `data:`-Zeile, Hauptfenster, `X-AppImage-Version`
 = 0.6.9, Update-Check meldet 0.6.8 (richtig, es ist noch nicht veröffentlicht). Kein Tag, kein
 GitHub-Release — das Paket liegt zum Testen bereit.
+
+### Die Zahl hinter „bash-lastig"
+Bevor ich am Muster etwas geändert habe, habe ich die 285 `bash`-Aufrufe aus dem echten Verlauf
+ausgezählt (aus der Datenbank, ohne Modellaufruf):
+
+| Programm | Anzahl | Anteil |
+|---|---|---|
+| `env -u PYTHONHOME -u PYTHONPATH python3 -c …` | 121 | 42 % |
+| `grep` (in der Shell) | 45 | 16 % |
+| `sed -n '…p'` (Datei lesen) | 42 | 15 % |
+| `cargo` | 36 | 13 % |
+| `git` | 23 | 8 % |
+| `cat`/`ls`/`find`/`head` | 4 | 1 % |
+
+Damit war meine erste Vermutung halb falsch: Es sind nicht die Builds. **Zwei Drittel der Aufrufe
+sind Arbeit, die `read` und `grep` in je einer Runde erledigen würden** — Dateien lesen per `sed`,
+suchen per Shell-`grep` — und 42 % bestehen nur aus einem Wrapper, der nichts bewirkt: Das Bundle
+setzt `PYTHONHOME`/`PYTHONPATH` nicht (AppRun, Hooks und Binary geprüft; der Kern nennt die Namen
+nur, um sie zu *entfernen*). Die Gewohnheit stammt also aus einem früheren Fehlschlag, nicht aus
+einer Notwendigkeit.
+
+**Änderung, klein und ehrlich:** Die Beschreibungen von `bash`, `read` und `grep` sagen jetzt genau
+das — dass die Umgebung bereits bereinigt ist (also kein `env -u …`), und dass ein Shell-Aufruf eine
+ganze Runde kostet, während `read` und `grep` mehrere Dateien in einer erledigen. Ob das wirkt, ist
+ungemessen; es ist eine Beschreibungsänderung, und die zehn Aufgaben in `docs/companion-checks.md`
+sind der Maßstab dafür.
