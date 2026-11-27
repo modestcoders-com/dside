@@ -6291,3 +6291,56 @@ das — dass die Umgebung bereits bereinigt ist (also kein `env -u …`), und da
 ganze Runde kostet, während `read` und `grep` mehrere Dateien in einer erledigen. Ob das wirkt, ist
 ungemessen; es ist eine Beschreibungsänderung, und die zehn Aufgaben in `docs/companion-checks.md`
 sind der Maßstab dafür.
+
+## 143. Vier Befunde aus dem Alltag: Allowlist-Meldung, touch, Compaction (2026-11-27)
+
+Bericht aus einer anderen Instanz, vier Punkte. Zwei davon waren anders, als sie klingen — das
+gehört dazu.
+
+### „Die Allowlist ist enger als die Doku"
+Nachgemessen und reproduziert: **`|` funktioniert**, auch mit `>` und `|` *innerhalb* von
+Anführungszeichen (`grep "-> Result"`, `grep 'a|b'`). Was den Nutzer traf, war die Meldung: Der
+Scanner lehnte aus vier möglichen Gründen ab (unbalancierte Quotes, Backtick, `$(…)`,
+Umleitung/Background) und schrieb **einen** Satz, der alle vier aufzählt — „ich habe nicht
+herausgefunden, welches Zeichen sie stört".
+
+**Änderung:** `split_commands` gibt jetzt einen Grund als Wert zurück (`Refusal`) statt `None`, mit
+**Zeichen und Position**: „a redirection `>` — to create a file, use `write` (at character 5)",
+„the quote \" opened at character 4 never closes". Derselbe Grund erscheint in der Meldung des
+Verifiers.
+
+**Shell-Schlüsselwörter** bekommen einen eigenen Satz: `for`, `while`, `if`, `case` … sind Grammatik,
+kein fehlendes Programm — vorher stand da „`for` is not in the command allowlist", was das Modell
+nach einem Programm namens `for` suchen ließ.
+
+**`touch` und `mkdir`** stehen jetzt im Standard (harmlos und idempotent; `rm` und `cp` bleiben
+draußen — eines löscht, eines überschreibt). Eine zweite Momentaufnahme der Liste
+(`PREVIOUS_TEXT_TOOL_COMMANDS`, die 79 Einträge von 0.6.7) sorgt dafür, dass auch eine Installation,
+die schon auf 0.6.7 steht, vorwärts wandert; eine angepasste Liste passt auf keine Momentaufnahme und
+bleibt unangetastet.
+
+**Die `bash`-Beschreibung** nennt jetzt die echten Grenzen und den Ausweg: keine Heredocs, keine
+Schleifen, `write` + Interpreter statt Umweg.
+
+### „Nach der Kompression fehlten die Tool-Ergebnisse — ich habe einen unbelegten Bericht geschrieben"
+Der schwerwiegendste Punkt, und er stimmt. `compactable_messages` liest **nur Nutzer- und
+Assistenten-Text**; Tool-Ergebnisse werden weder in die Zusammenfassung aufgenommen noch bleiben sie
+im Kontext (`KEEP_RECENT = 8` Nachrichten). Nach dem Schnitt hat das Modell also Erinnerungen an
+Behauptungen, aber nicht an die Belege — und ein rekonstruierter Hash liest sich wie ein gemessener.
+
+**Änderung, zwei Stellen:**
+1. **Kontextnotiz im Prompt.** Wenn eine Zusammenfassung existiert und Tool-Ergebnisse gefaltet
+   wurden, steht im Systemprompt: wie viele es waren, dass nur die Zusammenfassung übrig ist, und
+   dass jede Zahl, jeder Hash, jedes Testergebnis von davor **in diesem Zug unbelegt** ist — erst
+   nachsehen, dann behaupten; nicht aus dem Gedächtnis rekonstruieren. Die Zahl kommt aus
+   `folded_tool_results` (Test deckt die Zählung ab).
+2. **Die Zusammenfassungs-Instruktion** sagt jetzt, dass sie nur Text sieht: „reported as checked, by
+   an output you no longer have" statt „confirmed stays a fact". Vorher konnte die Zusammenfassung
+   einen Beleg in eine Tatsache verwandeln, den sie nie gesehen hatte.
+
+**Ungemessen:** ob die Notiz das Modell tatsächlich zum Nachprüfen bringt. Sie ist eine
+Prompt-Änderung; die zehn Aufgaben in `docs/companion-checks.md` sind der Maßstab.
+
+`cargo test --lib` **146** / 14 ignoriert (vier neue Tests: Meldung mit Position, Schlüsselwort-Satz,
+Pipes-und-Anführungszeichen bleiben erlaubt, Zählung der gefalteten Ergebnisse), `vue-tsc` grün,
+i18n 556 Schlüssel, `check:private` sauber.

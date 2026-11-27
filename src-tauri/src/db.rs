@@ -1799,6 +1799,27 @@ impl Db {
         .map_err(|error| error.to_string())
     }
 
+    /// How many tool results the compression took out of the context.
+    ///
+    /// The summary is written from user and assistant text only, so every tool result before the
+    /// fold point is gone — not summarised, gone. The engine puts this number in front of the
+    /// model, because a model that does not know it lost its evidence reconstructs it, and a
+    /// reconstructed hash or test count reads exactly like a measured one.
+    pub fn folded_tool_results(&self, session_id: &str) -> Result<i64, String> {
+        let conn = self.lock()?;
+        let through = summary_of(&conn, session_id)?.map(|(id, _)| id).unwrap_or(0);
+        if through == 0 {
+            return Ok(0);
+        }
+        conn.query_row(
+            "SELECT count(*) FROM messages
+             WHERE session_id = ?1 AND id <= ?2 AND role = 'tool'",
+            params![session_id, through],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|error| error.to_string())
+    }
+
     pub fn set_session_summary(
         &self,
         session_id: &str,
@@ -2620,6 +2641,41 @@ mod tests {
         assert_eq!(row.info.path, "/tmp/a.txt");
         assert_eq!(row.content.as_deref(), Some("alt"));
         assert_eq!(row.info.origin, "edit");
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    /// The report that started this: after a compression a model wrote hashes and test counts it
+    /// had no evidence for. The count is what lets the engine say so in the prompt.
+    #[test]
+    fn the_folded_tool_results_are_counted() {
+        let directory = std::env::temp_dir().join(format!("ds-ide-fold-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let db = Db::open(&directory.join("test.sqlite3")).unwrap();
+
+        db.create_session("s1", "t", "/tmp").unwrap();
+        let user = db
+            .insert_message("s1", "user", Some("go"), None, None)
+            .unwrap();
+        db.insert_message("s1", "tool", Some("exit 0"), None, Some("c1"))
+            .unwrap();
+        db.insert_message("s1", "tool", Some("output"), None, Some("c2"))
+            .unwrap();
+        let later_tool = db.insert_message("s1", "tool", Some("after"), None, Some("c3"))
+            .unwrap();
+        assert_eq!(
+            db.folded_tool_results("s1").unwrap(),
+            0,
+            "without a summary nothing is folded"
+        );
+
+        // A summary that reaches the first user message folds both tool results before it.
+        db.set_session_summary("s1", user, "summary").unwrap();
+        assert_eq!(db.folded_tool_results("s1").unwrap(), 0);
+
+        db.set_session_summary("s1", later_tool, "summary").unwrap();
+        assert_eq!(db.folded_tool_results("s1").unwrap(), 3);
 
         let _ = std::fs::remove_dir_all(&directory);
     }

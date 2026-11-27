@@ -501,10 +501,11 @@ pub async fn compact_session(
          Keep what still matters: decisions and their reasons, facts about the user, the state of \
          the work, open tasks and next steps, and anything the user asked you to remember. Drop \
          pleasantries, repetition and detail that no longer influences anything. \
-         Keep the difference between what was checked and what was only assumed: a statement a tool \
-         result confirmed stays a fact, and anything that was merely claimed is kept as an open \
-         question ('unverified: ...'), never as a fact. Never turn a plan into a result while \
-         summarising, and never add facts the conversation did not contain. \
+         You are given user and assistant text only — tool results are not in this transcript, so you \
+         cannot see what was verified. Keep that distinction explicit: what the assistant said was \
+         checked stays 'reported as checked, by an output you no longer have', and anything merely \
+         claimed is kept as an open question ('unverified: ...'), never as a fact. Never turn a plan \
+         into a result while summarising, and never add facts the conversation did not contain. \
          Write notes, not prose, in the user's language. Never answer the conversation — only summarise it.",
     );
     let messages = vec![instructions, ChatMessage::user(transcript)];
@@ -2796,6 +2797,28 @@ async fn run_turn(
              they take precedence over general habits.\n\n",
         );
         system_prompt.push_str(&rules);
+    }
+
+    // What the compression took away. The summary is written from user and assistant text, so
+    // every tool result before the fold point is gone — and a model that does not know that
+    // reconstructs its evidence. That is how a report full of hashes and counts becomes fiction
+    // while sounding like a measurement.
+    if let Some(db) = app.try_state::<Db>() {
+        match db.folded_tool_results(session_id) {
+            Ok(count) if count > 0 => {
+                system_prompt.push_str(&format!(
+                    "\n\n## Context note\n\
+                     Earlier in this conversation, {count} tool result(s) were folded into a \
+                     summary, and only the summary is still here — not the outputs themselves. \
+                     Anything from before that point is therefore unverified in this turn: a \
+                     number, a hash, a test count, a line number, a file's contents. Before you \
+                     state one, look it up again. Do not reconstruct a result from memory; that \
+                     is how a report becomes fiction while sounding certain. If you cannot check \
+                     it, say that you could not check it.\n"
+                ));
+            }
+            _ => {}
+        }
     }
 
     // Notes a plugin ships for the companion. A folder with only SERVER.md is readable this way

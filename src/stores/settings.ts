@@ -82,6 +82,21 @@ const PREVIOUS_DEFAULT_COMMANDS = [
   "du", "df", "tree", "uname", "ver", "whoami", "env", "printenv", "date", "sleep",
 ];
 
+/** The list 0.6.7 shipped (the text tools, no `touch`/`mkdir`). Kept verbatim for the same
+ *  reason as the one above: it recognises an untouched list from that release. */
+const PREVIOUS_TEXT_TOOL_COMMANDS = [
+  "pnpm", "npm", "npx", "yarn", "bun", "node", "deno",
+  "cargo", "rustc", "rustup", "git",
+  "python", "python3", "py", "pip", "pytest", "uv", "poetry",
+  "dotnet", "go", "java", "javac", "mvn", "gradle",
+  "make", "cmake", "gcc", "g++", "clang", "tsc", "tsx", "vite", "vitest",
+  "jest", "eslint", "prettier", "ruff", "black", "mypy", "sqlite3",
+  "sed", "awk", "test", "jq", "xxd", "base64", "sha256sum", "md5sum",
+  "ls", "dir", "pwd", "cd", "cat", "type", "head", "tail", "grep", "rg", "find",
+  "where", "which", "echo", "sort", "uniq", "wc", "diff", "cmp", "file", "stat",
+  "du", "df", "tree", "uname", "ver", "whoami", "env", "printenv", "date", "sleep",
+];
+
 export const defaultAllowedCommands = [
   "pnpm", "npm", "npx", "yarn", "bun", "node", "deno",
   "cargo", "rustc", "rustup", "git",
@@ -94,6 +109,10 @@ export const defaultAllowedCommands = [
   // `cmp` already stands in the group below — the list is rendered one chip per entry, so a
   // second mention would be a second chip with the same key.
   "sed", "awk", "test", "jq", "xxd", "base64", "sha256sum", "md5sum",
+  // Creating a scratch directory or an empty file is harmless and needs no shell trick; `touch`
+  // and `mkdir -p` change nothing that exists. `rm` and `cp` stay out on purpose — one deletes,
+  // one overwrites — and anyone who wants them adds them under Policies.
+  "touch", "mkdir",
   "ls", "dir", "pwd", "cd", "cat", "type", "head", "tail", "grep", "rg", "find",
   "where", "which", "echo", "sort", "uniq", "wc", "diff", "cmp", "file", "stat",
   "du", "df", "tree", "uname", "ver", "whoami", "env", "printenv", "date", "sleep",
@@ -332,7 +351,11 @@ export async function initSettings(): Promise<void> {
   // An untouched list moves forward with the defaults. Recognising it by exact equality makes
   // this self-limiting: as soon as anybody adds or removes a program the lists stop matching,
   // and nothing is ever re-added behind their back.
-  const migrated = sameCommands(settings.allowedCommands, PREVIOUS_DEFAULT_COMMANDS);
+  // Each release adds a snapshot of the list it shipped, so an installation that skipped one
+  // release still moves forward; a customised list matches none of them and is left alone.
+  const migrated =
+    sameCommands(settings.allowedCommands, PREVIOUS_DEFAULT_COMMANDS) ||
+    sameCommands(settings.allowedCommands, PREVIOUS_TEXT_TOOL_COMMANDS);
   if (migrated) settings.allowedCommands = [...defaultAllowedCommands];
 
   // A database with no settings rows is a fresh install. Existing installations — including

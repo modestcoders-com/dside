@@ -125,7 +125,7 @@ pub fn definitions() -> Vec<Value> {
             "type": "function",
             "function": {
                 "name": "bash",
-                "description": "Run a command with `sh -c` in the workspace; returns exit code, stdout and stderr, and `is_error` is true when the exit code is non-zero. Timeout defaults to 120 s with a ceiling of 1800 s — give a cold build several minutes in `timeout_ms` rather than guessing low and being cut off. Under command policy `allowlist` every segment of a pipeline must start with an allowed program name: no paths, no `>` to a file, no backticks or `$(...)`; `|` and `2>&1` are fine. Blocked in read mode and in everyday mode, and in Ask mode every call is approved first. Output is capped at 30k characters and says when it truncated. The environment is already sanitised for children: `LD_LIBRARY_PATH`, `PYTHONHOME`, `PYTHONPATH` and `ARGV0` entries that point into a bundle are removed before the shell starts, so wrapping a command in `env -u PYTHONHOME -u PYTHONPATH` changes nothing. Read files with `read` and search with `grep` instead of `cat`, `sed -n` or shell `grep`: every shell call costs a whole round, and a round has a budget. Example: {\"command\":\"cargo test --lib 2>&1 | tail -20\",\"timeout_ms\":600000}.",
+                "description": "Run a command with `sh -c` in the workspace; returns exit code, stdout and stderr, and `is_error` is true when the exit code is non-zero. Timeout defaults to 120 s with a ceiling of 1800 s — give a cold build several minutes in `timeout_ms` rather than guessing low and being cut off. Under command policy `allowlist` every segment of a pipeline must start with an allowed program name: no paths, no `>`/`<` to a file, no backticks or `$(...)`, no bare `&`, no heredocs; `|`, `&&` and `2>&1` are fine. Shell loops and conditionals (`for`, `while`, `if`) are refused as grammar the policy cannot check — write the file with `write` and run it with the interpreter you name. `rm` and `cp` are not in the default allowlist on purpose (one deletes, one overwrites); the user can add them under Policies. Blocked in read mode and in everyday mode, and in Ask mode every call is approved first. Output is capped at 30k characters and says when it truncated. The environment is already sanitised for children: `LD_LIBRARY_PATH`, `PYTHONHOME`, `PYTHONPATH` and `ARGV0` entries that point into a bundle are removed before the shell starts, so wrapping a command in `env -u PYTHONHOME -u PYTHONPATH` changes nothing. Read files with `read` and search with `grep` instead of `cat`, `sed -n` or shell `grep`: every shell call costs a whole round, and a round has a budget. Example: {\"command\":\"cargo test --lib 2>&1 | tail -20\",\"timeout_ms\":600000}.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -499,6 +499,13 @@ pub(crate) fn resolve(workspace: &Path, input: &str) -> PathBuf {
     }
 }
 
+/// Shell grammar masquerading as a program name. Refused with an explanation, not with
+/// "not in the allowlist" — a model that sees `for is not in the allowlist` keeps looking.
+const SHELL_KEYWORDS: &[&str] = &[
+    "for", "while", "until", "if", "then", "elif", "else", "fi", "do", "done", "case", "esac",
+    "function", "select", "time",
+];
+
 /// Splits a shell command into its simple commands. Quoting matters: `grep "a\|b" file` is one
 /// command whose pattern contains a pipe, not two commands. Splitting on the raw characters
 /// turned every regex alternation into a second program name, so the allowlist refused commands
@@ -506,7 +513,7 @@ pub(crate) fn resolve(workspace: &Path, input: &str) -> PathBuf {
 ///
 /// Returns `None` for anything this policy will not reason about: unterminated quotes,
 /// backticks, command substitution, background jobs and redirections.
-fn split_commands(command: &str) -> Option<Vec<String>> {
+fn split_commands(command: &str) -> Result<Vec<String>, Refusal> {
     let mut segments = Vec::new();
     let mut current = String::new();
     let mut chars = command.chars().peekable();
@@ -532,8 +539,10 @@ fn split_commands(command: &str) -> Option<Vec<String>> {
                     quote = Some(ch);
                     current.push(ch);
                 }
-                '`' => return None,
-                '$' if chars.peek() == Some(&'(') => return None,
+                '`' => return Err(Refusal::Backtick(position(&current))),
+                '$' if chars.peek() == Some(&'(') => {
+                    return Err(Refusal::Substitution(position(&current)))
+                }
                 '\\' => {
                     // A backslash outside quotes escapes the next character — `\|` is data.
                     current.push(ch);
@@ -562,7 +571,7 @@ fn split_commands(command: &str) -> Option<Vec<String>> {
                         }
                         continue;
                     }
-                    return None;
+                    return Err(Refusal::Redirect(position(&current), ch));
                 }
                 '&' => {
                     // `&&` separates; job control (`&`) and `&>file` do not belong in a policy
@@ -572,7 +581,7 @@ fn split_commands(command: &str) -> Option<Vec<String>> {
                         segments.push(current.trim().to_string());
                         current.clear();
                     } else {
-                        return None;
+                        return Err(Refusal::Background(position(&current)));
                     }
                 }
                 ';' => {
@@ -591,11 +600,54 @@ fn split_commands(command: &str) -> Option<Vec<String>> {
             },
         }
     }
-    if quote.is_some() {
-        return None;
+    if let Some(open) = quote {
+        return Err(Refusal::Quote(open, position(&current)));
     }
     segments.push(current.trim().to_string());
-    Some(segments)
+    Ok(segments)
+}
+
+/// Why the policy refuses to analyse a command line. It is a value, not a `None`, because the
+/// sentence the user and the model read has to name the character — "an unterminated quote, a
+/// backtick, $(...) or a redirection" left a reader guessing which of four it was.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Refusal {
+    /// A quote that never closed, and where it opened (1-based character position).
+    Quote(char, usize),
+    Backtick(usize),
+    Substitution(usize),
+    Redirect(usize, char),
+    Background(usize),
+}
+
+impl Refusal {
+    pub(crate) fn reason(&self) -> String {
+        let describe = |ch: char| match ch {
+            '>' => "a redirection `>` — to create a file, use `write`".to_string(),
+            '<' => "a redirection `<` or heredoc `<<` — to create a file, use `write`".to_string(),
+            other => format!("a redirection `{other}`"),
+        };
+        match self {
+            Refusal::Quote(open, at) => format!(
+                "the quote {open} opened at character {at} never closes"
+            ),
+            Refusal::Backtick(at) => format!(
+                "a backtick at character {at} (`` `cmd` `` runs a command this policy cannot see)"
+            ),
+            Refusal::Substitution(at) => format!(
+                "a command substitution `$(…)` at character {at}"
+            ),
+            Refusal::Redirect(at, ch) => format!("{} (at character {at})", describe(*ch)),
+            Refusal::Background(at) => format!(
+                "a background job `&` at character {at} (use `&&` to chain, or separate commands)"
+            ),
+        }
+    }
+}
+
+/// 1-based position of the next character to be read, for a message that can be followed.
+fn position(current: &str) -> usize {
+    current.chars().count() + 1
 }
 
 /// The allowlist is a policy, not an OS sandbox: it checks every simple command's program name
@@ -614,12 +666,14 @@ pub(crate) fn check_command(command: &str, allowed: &[String]) -> Result<(), Str
     if command.is_empty() {
         return Err("the command is empty".to_string());
     }
-    let Some(segments) = split_commands(command) else {
-        return Err(
-            "the command uses a shell feature this policy does not analyse: an unterminated \
-             quote, a backtick, $(...) or a redirection"
-                .to_string(),
-        );
+    let segments = match split_commands(command) {
+        Ok(segments) => segments,
+        Err(refusal) => {
+            // Name the character and where it is. The old sentence listed four possibilities and
+            // left the reader to guess; a refusal that cannot be acted on reads as an arbitrary
+            // limit instead of a policy.
+            return Err(refusal.reason());
+        }
     };
     for segment in segments {
         if segment.is_empty() {
@@ -670,6 +724,18 @@ pub(crate) fn check_command(command: &str, allowed: &[String]) -> Result<(), Str
                      `{name}` is not in the allowlist either"
                 )
             });
+        }
+        if SHELL_KEYWORDS.contains(&name.as_str()) {
+            // `for f in *; do …; done` splits into `for f in *` and looks like a missing program.
+            // It is not: loops and conditionals are shell grammar the allowlist cannot check,
+            // because the body may call anything. Say that instead of sending the model looking
+            // for a program called `for`.
+            return Err(format!(
+                "`{name}` is a shell keyword, not a program: loops and conditionals are not \
+                 analysed by the allowlist (the body could call anything). Run the steps as \
+                 separate commands, or write a script with `write` and start it with the \
+                 interpreter you name."
+            ));
         }
         if !allowed
             .iter()
@@ -1312,7 +1378,7 @@ fn on_path(program: &str, extra: &[String]) -> bool {
 /// `command not found` into advice — the rustup case needed exactly that: the program was
 /// allowed, it existed, and it was invisible because it was not on `PATH`.
 fn missing_program(command: &str, ctx: &ToolContext) -> Option<String> {
-    for segment in split_commands(command)? {
+    for segment in split_commands(command).ok()? {
         let mut words = segment.split_whitespace();
         let mut program = words.next().unwrap_or("");
         while program.contains('=') {
@@ -1401,12 +1467,14 @@ const GIT_READONLY: &[&str] = &["status", "log", "show", "diff", "rev-parse", "l
 /// Would this change anything? The verifier's rule: if the answer is not a clear "no", it does not
 /// run — and then the verifier says it could not check, rather than claiming it did.
 pub(crate) fn check_readonly(command: &str) -> Result<(), String> {
-    let Some(segments) = split_commands(command) else {
-        return Err(
-            "the command uses a feature this rule cannot analyse: a redirection, a backtick or \
-             $(...). The verifier may read; it may not write, and it may not hide what it does."
-                .to_string(),
-        );
+    let segments = match split_commands(command) {
+        Ok(segments) => segments,
+        Err(refusal) => {
+            return Err(format!(
+                "{}. The verifier may read; it may not write, and it may not hide what it does.",
+                refusal.reason()
+            ));
+        }
     };
     for segment in segments {
         if segment.trim().is_empty() {
@@ -2096,5 +2164,66 @@ mod tests {
             outcome.content
         );
         println!("{}", outcome.content.lines().next().unwrap_or("(empty)"));
+    }
+}
+
+#[cfg(test)]
+mod refusal_tests {
+    use super::*;
+
+    fn allowed() -> Vec<String> {
+        vec!["cargo".to_string(), "grep".to_string(), "head".to_string()]
+    }
+
+    /// The report that started this: four possibilities in one sentence, and no way to tell
+    /// which character was meant. Every refusal now names the character and where it is.
+    #[test]
+    fn a_refusal_names_the_character_and_its_position() {
+        let error = check_command("cat > out.txt", &allowed()).unwrap_err();
+        assert!(error.contains("a redirection `>`"), "{error}");
+        assert!(error.contains("character 5"), "{error}");
+
+        let heredoc = check_command("cat <<'EOF'", &allowed()).unwrap_err();
+        assert!(heredoc.contains("heredoc"), "{heredoc}");
+        assert!(heredoc.contains("use `write`"), "{heredoc}");
+
+        let backtick = check_command("grep `date` file", &allowed()).unwrap_err();
+        assert!(backtick.contains("a backtick at character 6"), "{backtick}");
+
+        let substitution = check_command("grep $(date) file", &allowed()).unwrap_err();
+        assert!(substitution.contains("command substitution"), "{substitution}");
+
+        let quote = check_command("grep \"unclosed", &allowed()).unwrap_err();
+        assert!(quote.contains("never closes"), "{quote}");
+
+        let background = check_command("cargo test & ", &allowed()).unwrap_err();
+        assert!(background.contains("background job"), "{background}");
+    }
+
+    /// A loop is shell grammar, not a missing program — "for is not in the allowlist" sends the
+    /// model looking for a program called `for`.
+    #[test]
+    fn a_shell_keyword_says_what_it_is() {
+        let error = check_command("for f in *.rs; do echo $f; done", &allowed()).unwrap_err();
+        assert!(error.contains("`for` is a shell keyword"), "{error}");
+        assert!(error.contains("not analysed"), "{error}");
+    }
+
+    /// The documented promise, tested as promised: a pipe between two allowed programs works,
+    /// including a pattern that carries `|`, `>` or an apostrophe inside quotes.
+    #[test]
+    fn pipes_and_quoted_specials_stay_allowed() {
+        for command in [
+            "cargo test --lib 2>&1 | grep \"test result\"",
+            "cargo test | grep -E \"ok|FAILED\"",
+            "cargo test | grep \"-> Result\"",
+            "cargo test | grep 'a|b'",
+            "cargo test | grep \"it's\"",
+        ] {
+            assert!(
+                check_command(command, &allowed()).is_ok(),
+                "refused: {command}"
+            );
+        }
     }
 }
