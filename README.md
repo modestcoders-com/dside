@@ -62,6 +62,8 @@ work area shows a preview, not an editor.*
 - Settings → a group named after the partner (memory, name, the user's own instructions).
 - **Recall:** the partner can search its long-term notes and earlier conversations by keyword; results are limited to the current project.
 - **Everyday mode**: the partner gets no shell, code review or sub-agents, and code panels make way for documents and the web; the user's terminal and Git tabs remain.
+- **Plugins:** a folder with a `plugin.json` adds tools the app does not ship — an optional program speaks JSON-RPC over stdio, a `SERVER.md` adds notes without any program. Settings → Plugins lists what was found, switches a plugin on **per project**, and has a Test button that starts the server once to show what it offers. Plugin tools go through the same approval gate as `bash`.
+- **Round budget per turn:** a turn that keeps working gets 24 rounds, then a checkpoint that shows it what it has actually done (which tool, how often, whether a command repeated) and three questions, then 24 more rounds, and finally one round without tools to write the hand-over. A long task ends with a report instead of a cut.
 - Six languages (de, en, es, fr, ru, zh-Hans), light and dark theme, adjustable reading size.
 - API key in the OS keychain, never in the frontend. Everything local in SQLite.
 
@@ -98,9 +100,14 @@ see `.github/workflows/release.yml`.
 pnpm build                                                   # vue-tsc + vite
 cd src-tauri && cargo test                                   # unit tests
 DS_IDE_API_KEY=... cargo test --lib live_deepseek -- --ignored --nocapture
+pnpm status                                                  # the numbers, measured
 ```
 
 The live tests talk to the real provider and cost tokens; they are ignored by default.
+
+`pnpm status` prints what a release note quotes — how many tests pass, how many i18n keys exist,
+the three manifest versions and the current tag — so those numbers are measured rather than typed.
+A number written by hand into a document goes stale the moment someone adds a test.
 
 ## Structure
 

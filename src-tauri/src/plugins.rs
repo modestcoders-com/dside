@@ -983,16 +983,24 @@ mod tests {
     }
 
     /// A plugin that ships a program, a schema and notes.
+    ///
+    /// The id is a parameter because the running servers live in a process-wide map keyed by
+    /// `id` + workspace, and `forget(id)` kills every server of that id. Two tests sharing an id
+    /// therefore kill each other's server when cargo runs them in parallel — a flake that showed
+    /// up as 2 red runs in 12. Each test gets its own id.
     #[cfg(unix)]
     fn demo_plugin(name: &str) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
 
+        let id = name;
         let root = temp_dir(name);
-        let dir = root.join("demo");
+        let dir = root.join(id);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("plugin.json"),
-            r#"{"id":"demo","name":"Demo","description":"d","entry":"server","tools":["ping"]}"#,
+            format!(
+                r#"{{"id":"{id}","name":"Demo","description":"d","entry":"server","tools":["ping"]}}"#
+            ),
         )
         .unwrap();
         std::fs::write(dir.join("SERVER.md"), "Call ping before anything else.").unwrap();
@@ -1022,12 +1030,12 @@ done
     async fn an_enabled_plugin_contributes_exactly_its_declared_tools() {
         let root = demo_plugin("offer");
         let workspace = root.to_string_lossy().to_string();
-        let config = config_for(&workspace, &["demo"], "ask");
+        let config = config_for(&workspace, &["offer"], "ask");
 
         let definitions = definitions_in(discover(&root), &config, &workspace).await;
         assert_eq!(definitions.len(), 1, "{definitions:?}");
         let function = &definitions[0]["function"];
-        assert_eq!(function["name"], "plugin__demo__ping");
+        assert_eq!(function["name"], "plugin__offer__ping");
         assert!(function["description"]
             .as_str()
             .unwrap_or("")
@@ -1036,15 +1044,15 @@ done
         assert_eq!(function["parameters"]["properties"]["q"]["type"], "string");
 
         // Read mode offers nothing: nobody knows what a foreign tool does.
-        let read = config_for(&workspace, &["demo"], "read");
+        let read = config_for(&workspace, &["offer"], "read");
         assert!(definitions_in(discover(&root), &read, &workspace).await.is_empty());
         // Another folder has the plugin off, even though the id is enabled elsewhere.
-        let elsewhere = config_for("/somewhere/else", &["demo"], "ask");
+        let elsewhere = config_for("/somewhere/else", &["offer"], "ask");
         assert!(definitions_in(discover(&root), &elsewhere, "/somewhere/else")
             .await
             .is_empty());
 
-        forget("demo");
+        forget("offer");
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -1054,12 +1062,12 @@ done
     fn notes_of_enabled_plugins_reach_the_prompt() {
         let root = demo_plugin("notes-prompt");
         let workspace = root.to_string_lossy().to_string();
-        let config = config_for(&workspace, &["demo"], "ask");
+        let config = config_for(&workspace, &["notes-prompt"], "ask");
         let block = notes_in(discover(&root), &config, &workspace);
         assert!(block.contains("Plugin notes"), "{block}");
         assert!(block.contains("Call ping before anything else."), "{block}");
 
-        let read = config_for(&workspace, &["demo"], "read");
+        let read = config_for(&workspace, &["notes-prompt"], "read");
         assert!(notes_in(discover(&root), &read, &workspace).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -1132,11 +1140,13 @@ done
         use std::os::unix::fs::PermissionsExt;
 
         let root = temp_dir("call-real");
-        let dir = root.join("demo");
+        // Its own id: the server cache is process-wide and `forget(id)` kills every server of
+        // that id, so a shared one lets parallel tests end each other's servers.
+        let dir = root.join("call-real");
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("plugin.json"),
-            r#"{"id":"demo","entry":"server","tools":["ping"]}"#,
+            r#"{"id":"call-real","entry":"server","tools":["ping"]}"#,
         )
         .unwrap();
         std::fs::write(
@@ -1170,7 +1180,7 @@ done
         let (text, is_error) = result_text(&called.expect("answer"));
         assert_eq!(text, "pong");
         assert!(!is_error);
-        forget("demo");
+        forget("call-real");
         let _ = std::fs::remove_dir_all(&root);
     }
 }

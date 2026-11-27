@@ -6344,3 +6344,41 @@ Prompt-Änderung; die zehn Aufgaben in `docs/companion-checks.md` sind der Maßs
 `cargo test --lib` **146** / 14 ignoriert (vier neue Tests: Meldung mit Position, Schlüsselwort-Satz,
 Pipes-und-Anführungszeichen bleiben erlaubt, Zählung der gefalteten Ergebnisse), `vue-tsc` grün,
 i18n 556 Schlüssel, `check:private` sauber.
+
+## 144. Ein fremdes Urteil angewendet: flackernder Test, README, Zahlen (2026-11-27)
+
+Er ließ ein anderes Projekt (nicht dieses) von einer zweiten Instanz prüfen und schickte das Urteil
+herüber. Dessen wichtigster Fund war eine Frage der Selbstauskunft: Die Fortschrittsdatei datierte
+Arbeit auf Tage, an denen die Commits nicht lagen — systematisch einen Tag daneben. Das ist keine
+Kleinigkeit, wenn die Datei laut eigenem Kopf „die Wahrheit, nicht der Chatverlauf" sein soll.
+
+Also habe ich die vier prüfbaren Punkte auf **dieses** Projekt angewendet:
+
+**1. Datumsdrift — nicht vorhanden, nachgemessen.** Jeder Chronik-Abschnitt von §135 bis §143 wurde
+gegen den Commit geprüft, der ihn eingeführt hat (`git log -S`): **alle neun stimmen auf den Tag.**
+Kein Abschnitt liegt in der Zukunft (54 Abschnitte geprüft), keiner springt rückwärts.
+
+**2. README — es war unvollständig, nicht falsch.** Der Text behauptet nirgends etwas, das der Code
+widerlegt. Aber er kannte **Plugins nicht** und das Rundbudget nicht — die erste Seite, die ein
+Fremder liest, ließ zwei Funktionen dieser Version aus. In allen sechs Sprachen ergänzt.
+
+**3. Klartext-Geheimnisse — keine gefunden.** Suche nach `IDENTIFIED BY`, zugewiesenen Passwörtern
+und API-Keys in SQL, Rust, TS, JSON, Markdown und Shell: kein Treffer. Der Schlüssel liegt im
+Schlüsselbund, `secrets.json` als 0600-Rückfall ist gitignored.
+
+**4. Ein flackernder Test — gefunden und behoben.** Beim Nachzählen der Tests schlug die Suite
+**einmal** fehl und danach nie wieder. Zwölf gezielte Läufe reproduzierten es: **2 von 12 rot**,
+in zwei verschiedenen Tests. Ursache: Drei Plugin-Tests benutzten dieselbe Plugin-ID `demo`, und der
+Server-Cache ist prozessweit; `forget("demo")` beendet **alle** Server dieser ID. Liefen die Tests
+parallel, tötete einer den Server des anderen. Jeder Test hat jetzt seine eigene ID — **0 von 20**
+Läufen rot, danach **0 von 10** für die ganze Suite.
+
+Das ist genau die Fehlerart, die ein handgeschriebenes „146 Tests grün" verdeckt: Die Zahl war
+richtig, als sie getippt wurde, und der Test darunter instabil.
+
+**5. Die Zahlen kommen jetzt aus einem Skript.** `pnpm status` misst Tests, i18n-Schlüssel, die drei
+Manifest-Versionen und den Tag — und endet mit Exit-Code 1, wenn ein Test rot ist. Die Regel für
+künftige Abschnitte: Zahlen aus `pnpm status`, nicht aus dem Gedächtnis.
+
+`cargo test --lib` **146** / 14 ignoriert (mit `pnpm status` gemessen), `vue-tsc` grün, i18n 556
+Schlüssel, `check:private` sauber.
