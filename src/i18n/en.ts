@@ -323,7 +323,7 @@ export const en: Messages = {
     done: "done",
     cancelled: "cancelled",
     maxTurns:
-      "The turn reached its limit of {rounds} rounds. One turn may make that many model calls — every tool step counts as one. What was done so far is kept; “Try again” continues.",
+      "The turn reached its round limit ({rounds} rounds; every tool use counts as one). What was done so far is kept. Write “continue” if it should go on — that starts a new turn with the full budget.",
     retry: "Retry",
   },
   model: {

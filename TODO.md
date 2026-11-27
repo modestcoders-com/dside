@@ -51,6 +51,17 @@ behaviour is recorded below as a decision, not a defect.
 These check the machinery, not the companion. Whether it works *well* is still the open question,
 and it needs a model call and a judgement — see `docs/companion-checks.md`.
 
+## Found in daily use (2026-11-27)
+
+- **The companion works bash-heavy.** In the last 400 messages of a real thread: 261 `bash` calls
+  against 3 `grep`, 1 `glob` and 30 `edit`. Every shell call costs a round, where one `grep` could
+  have read several files in one. That is the likeliest reason a large task runs into the round
+  ceiling. Not fixed: it is a working pattern in the prompt and the tool descriptions, and changing
+  it needs the ten checks of `docs/companion-checks.md` to show whether it helped.
+- **The round ceiling now has a checkpoint** (two budgets of 24 rounds and a final round without
+  tools, see PROGRESS §142). Raising the number itself is not needed any more: the ceiling grants
+  twice the work and ends with a hand-over instead of a cut.
+
 ## Found by QA
 
 Not fixed, because each one is a decision rather than a slip. See `docs/qa-log.md` for the runs.

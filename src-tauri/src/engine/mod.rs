@@ -1,3 +1,4 @@
+pub mod budget;
 pub mod deepseek;
 pub mod prompts;
 pub mod tools;
@@ -2806,6 +2807,10 @@ async fn run_turn(
     messages.insert(0, ChatMessage::system(system_prompt));
 
     let max_turns = config.max_turns.clamp(1, 100);
+    // The round ceiling is a checkpoint, not a wall: when the budget is spent the model
+    // accounts for the rounds (with the numbers from `budget::Ledger`) and gets a second one;
+    // when that is spent too it gets a last round without tools, so the turn ends with words.
+    let mut ledger = budget::Ledger::new(max_turns);
     let mut outcome_result: Result<(), String> = Ok(());
 
     // One assistant row for the whole turn, created up front. The timeline is written into it
@@ -2827,7 +2832,30 @@ async fn run_turn(
     // decision the user cannot influence any more — the question is gone from the screen.
     let mut question_expired = false;
 
-    for _turn in 0..max_turns {
+    loop {
+        match ledger.may_run() {
+            budget::Verdict::Run => {}
+            budget::Verdict::Review => {
+                // A user message between rounds is allowed: the tool block is complete.
+                messages.push(ChatMessage::user(ledger.review()));
+                crate::log_line!(
+                    "engine: checkpoint in {session_id} after {} of {} rounds",
+                    ledger.rounds(),
+                    ledger.budget()
+                );
+                seq += 1;
+                let mut note = EngineEvent::new(session_id, seq, "status");
+                note.status = Some("checkpoint".to_string());
+                emit(app, note);
+                continue;
+            }
+            budget::Verdict::WrapUp => {
+                messages.push(ChatMessage::user(ledger.wrap_up()));
+                crate::log_line!("engine: final round without tools in {session_id}");
+                continue;
+            }
+            budget::Verdict::Stop => break,
+        }
         if cancel.load(Ordering::SeqCst) {
             seq += 1;
             let mut event = EngineEvent::new(session_id, seq, "turn_end");
@@ -2860,7 +2888,9 @@ async fn run_turn(
                 event.text = Some(chunk.to_string());
                 emit(app, event);
             };
-            deepseek::stream_chat(config, &messages, &definitions, &mut on_delta).await
+            // The last round offers no tools at all, so the answer has to be prose.
+            let offered: &[Value] = if ledger.is_wrapped() { &[] } else { &definitions };
+            deepseek::stream_chat(config, &messages, offered, &mut on_delta).await
         };
         seq = streamed_seq;
 
@@ -2872,9 +2902,17 @@ async fn run_turn(
             }
         };
 
-        let has_tool_calls = !outcome.tool_calls.is_empty();
-        for call in &outcome.tool_calls {
-            all_tool_calls.push(serde_json::to_value(call).unwrap_or(Value::Null));
+        // A wrapped round counts as an answer even if the provider ignored the empty tool list:
+        // storing tool_calls without their results would break the next request.
+        let has_tool_calls = !outcome.tool_calls.is_empty() && !ledger.is_wrapped();
+        let round_calls: Vec<Value> = outcome
+            .tool_calls
+            .iter()
+            .map(|call| serde_json::to_value(call).unwrap_or(Value::Null))
+            .collect();
+        ledger.record(&round_calls);
+        if has_tool_calls {
+            all_tool_calls.extend(round_calls.iter().cloned());
         }
         let tool_calls_json = if all_tool_calls.is_empty() {
             None
@@ -2958,7 +2996,9 @@ async fn run_turn(
         }
 
         let mut pending_images: Vec<String> = Vec::new();
-        for call in &outcome.tool_calls {
+        let round_note = ledger.note();
+        let last_call = outcome.tool_calls.len().saturating_sub(1);
+        for (call_index, call) in outcome.tool_calls.iter().enumerate() {
             if cancel.load(Ordering::SeqCst) {
                 break;
             }
@@ -3394,7 +3434,16 @@ async fn run_turn(
             }));
             persist_turn(app, message_id, &said, tool_calls_json.as_deref(), &parts);
 
-            messages.push(ChatMessage::tool(call.id.clone(), tool_outcome.content));
+            // The note about the remaining rounds goes to the model only — the timeline keeps
+            // the tool's own output, so a later reader does not mistake our reminder for a result.
+            let mut for_model = tool_outcome.content.clone();
+            if call_index == last_call {
+                if let Some(note) = &round_note {
+                    for_model.push_str("\n\n");
+                    for_model.push_str(note);
+                }
+            }
+            messages.push(ChatMessage::tool(call.id.clone(), for_model));
             // The image must wait: a tool message may only be followed by the other tool results
             // of the same call block. Pushing a user message with the picture here split the
             // block whenever one assistant turn made several calls (preview + read + screenshot),

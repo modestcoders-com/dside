@@ -323,7 +323,7 @@ export const fr: Messages = {
     done: "Terminé",
     cancelled: "annulé",
     maxTurns:
-      "Le tour a atteint sa limite de {rounds} tours. Un tour peut faire autant d’appels au modèle — chaque étape d’outil en compte un. Ce qui a été fait reste ; « Réessayer » continue.",
+      "Le tour a atteint sa limite de tours ({rounds} ; chaque utilisation d’outil en compte un). Ce qui a été fait reste. Écrivez « continuer » pour poursuivre — cela ouvre un nouveau tour avec le budget complet.",
     retry: "Réessayer",
   },
   model: {

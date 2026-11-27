@@ -6207,3 +6207,56 @@ Der Server zählte 24 Runden plus einen Titelaufruf, und im Chat stand danach de
 Zwischenversuch und zeigt, dass ein echter Fehler weiterhin seinen eigenen Text behält.
 
 `.deb`, `.rpm` und AppImage wurden nicht neu gebaut; das Paket 0.6.8 enthält den alten Text.
+
+## 142. Die Rundengrenze wird ein Checkpoint statt einer Wand (2026-11-27)
+
+Seine Beobachtung: der Begleiter lief dreimal in dieselbe Grenze. Seine Frage danach: *„Was war
+denn Deiner Meinung nach der Fehler? … Wolltest Du das beheben oder nur die Meldung an den User
+unterdrücken?"* — und die ehrliche Antwort war: nur die Meldung. Zusätzlich stand in meinem neuen
+Text eine Unwahrheit („Erneut versuchen setzt fort"; `engine_retry` verwirft alles nach der letzten
+Nutzer-Nachricht und beginnt von vorn).
+
+### Was die Datenbank zeigte
+Der letzte Zug lief 33 Minuten und machte 31 Werkzeugaufrufe in 24 Runden — kein krankhafter
+Kreislauf, sondern ein großes Vorhaben. Auffälliger war etwas anderes: in den letzten 400 Nachrichten
+**261 `bash`-Aufrufe gegen 3 `grep`, 1 `glob` und 30 `edit`**. Jeder Shell-Befehl kostet eine eigene
+Runde, wo ein Lesewerkzeug mehrere Dateien in einem Aufruf hätte holen können.
+
+### Was jetzt passiert
+`engine/budget.rs` führt Buch über einen Zug und macht aus der Grenze drei Stufen:
+
+1. **Warnungen in den letzten drei Runden.** Die letzte Werkzeugantwort jedes Zuges trägt einen Satz
+   für das Modell („Rounds: 22 von 24 — 2 übrig. Bring den Schritt zu Ende und berichte."). Er wird
+   **nicht** gespeichert; die Zeitleiste zeigt weiter nur die Ausgabe des Werkzeugs.
+2. **Checkpoint bei erschöpftem Budget.** Das Modell bekommt die **Fakten**, die die Engine selbst
+   gezählt hat — wie viele Aufrufe welches Werkzeugs, wie oft derselbe Befehl lief, wie viele
+   Dateien geschrieben wurden — und drei Fragen: was ist fertig und welcher Check sagt das, was ist
+   offen, wiederholst du dich / ist der Umfang wirklich nötig. Danach ein **zweites Budget von 24
+   Runden**. Die Prüfung ist damit kein Schiedsrichter, sondern ein Spiegel: Ein Modell, das man
+   „bist du auf dem richtigen Weg?" fragt, sagt ja; eines, dem man „du hast denselben Build elf Mal
+   laufen lassen" zeigt, muss etwas tun.
+3. **Letzte Runde ohne Werkzeuge.** Ist auch das zweite Budget aufgebraucht, läuft eine Runde mit
+   leerer Werkzeugliste: Der Zug endet mit einem Übergabetext statt mitten im Schritt. Kein rotes
+   Kennzeichen, kein „Erneut versuchen", das nichts fortsetzt.
+
+### Belegt, ohne Modellaufruf
+Ein lokaler Fake-Endpunkt, der auf jede Anfrage einen Werkzeugaufruf zurückgibt und jede Anfrage
+protokolliert:
+
+- **Durchlauf bis zum Ende:** 49 Anfragen = 24 Runden + Checkpoint + 24 Runden + 1 Runde ohne
+  Werkzeuge (`tools=0`). Notizen erschienen in den letzten drei Runden beider Budgets, der
+  Checkpoint genau einmal (`engine: checkpoint in s-budget after 24 of 48 rounds`), die letzte Runde
+  mit `engine: final round without tools`. Der Chat endete mit dem Übergabetext, **ohne** rote
+  Meldung und ohne „Erneut versuchen".
+- **Modell, das am Checkpoint fertig ist:** 26 Anfragen, danach Schluss — das zweite Budget wird
+  gewährt, nicht erzwungen.
+- **Nichts davon landet im Verlauf:** Der Checkpoint und die Rundenhinweise sind nicht gespeichert
+  (1 Nutzer-Nachricht, kein „Checkpoint" im Verlauf), also sieht ein späterer Leser nur echte
+  Werkzeugausgaben.
+
+`cargo test --lib` **142** / 14 ignoriert (neun neue Tests für das Budget), `vue-tsc` grün, i18n 556
+Schlüssel, `check:private` sauber.
+
+**Noch offen und die eigentliche Ursache:** das bash-lastige Arbeiten (261 zu 3). Das ist keine
+Grenze, sondern ein Muster, und es gehört in eine eigene Runde — Behauptungen darüber wären heute
+geraten.

@@ -79,7 +79,7 @@ fn default_model() -> String {
 }
 
 fn default_max_turns() -> u32 {
-    24
+    crate::engine::budget::WORK_ROUNDS
 }
 
 fn default_permission() -> String {
