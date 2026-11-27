@@ -130,6 +130,7 @@ Preferimos informarte desde el principio antes de que lo descubras por las malas
 - **No hay instaladores firmados, ni certificación (notarización), ni actualizaciones automáticas.** Es posible que Windows SmartScreen o macOS Gatekeeper muestren advertencias, pero la aplicación sigue siendo instalable.
 - Windows está probado en Windows 11 y en CI; la versión de macOS solo se genera en CI y no se ha probado en hardware real.
 - Aún no existe una suite de pruebas de extremo a extremo (E2E) para el *frontend*; la CI ejecuta la compilación y las pruebas unitarias en Rust.
+- **La compresión descarta las salidas de herramientas.** El resumen se escribe solo con el texto del usuario y del asistente, así que un resultado de herramienta anterior al corte desaparece: no se acorta, desaparece. La app le dice al modelo que todo lo anterior está sin verificar en este turno, pero tú deberías saberlo también: un número o un hash de un tramo anterior es una prueba que ya no tienes.
 
 ### Orígenes y agradecimientos
 

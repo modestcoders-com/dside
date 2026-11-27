@@ -130,6 +130,7 @@ Wir möchten Sie lieber vorab informieren, anstatt dass Sie diese Punkte erst sp
 - **Keine signierten Installationsprogramme, keine Notarisierung, kein automatischer Update-Mechanismus.** Windows SmartScreen und macOS Gatekeeper werden entsprechende Warnungen anzeigen – die Anwendung lässt sich dennoch installieren.
 - Windows ist auf Windows 11 und in der CI getestet; der macOS-Build ist CI-only und wurde nicht auf echter Hardware getestet.
 - Es gibt noch keine E2E-Testsuite für das Frontend; die CI führt den Build sowie die Rust-Unit-Tests aus.
+- **Die Kompression verwirft Werkzeugausgaben.** Die Zusammenfassung entsteht nur aus Nutzer- und Assistenten-Text; ein Werkzeugergebnis von vor dem Schnitt ist danach weg — nicht gekürzt, weg. Die App sagt dem Modell, dass alles davor in diesem Zug unbelegt ist — aber du solltest es auch wissen: eine Zahl oder ein Hash aus einem früheren Abschnitt ist ein Beleg, den du nicht mehr hast.
 
 ### Ursprung & Danksagungen
 

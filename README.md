@@ -134,6 +134,7 @@ scripts/              small tools (e.g. the name-table importer)
 - One instance per desktop: starting it again brings the existing window forward instead of opening a second copy.
 - Windows is tested on Windows 11 and in CI. The macOS build is CI-only and has not been runtime-tested on a Mac.
 - No frontend E2E suite yet; CI runs the build and the Rust unit tests.
+- **Compression drops tool outputs.** A summary is written from user and assistant text only, so a tool result from before the fold point is gone — not shortened, gone. The app tells the model that anything from before is unverified in this turn, but you should know it too: a number or a hash from an earlier stretch is evidence you no longer hold.
 
 ## Origins and acknowledgements
 

@@ -130,6 +130,7 @@ Nous préférons vous en informer dès maintenant plutôt que vous ne les décou
 - **Absence de signature numérique, de notarisation et de mise à jour automatique.** Windows SmartScreen et macOS Gatekeeper afficheront des avertissements, mais l'application reste installable.
 - Windows est testé sous Windows 11 et via la CI ; la version macOS est générée par la CI et n'a pas été testée sur une machine réelle.
 - Il n'existe pas encore de suite de tests de bout en bout (E2E) pour l'interface ; la CI exécute la compilation ainsi que les tests unitaires en Rust.
+- **La compression écarte les sorties d'outils.** Le résumé n'est écrit qu'à partir du texte de l'utilisateur et de l'assistant : un résultat d'outil antérieur au point de coupe disparaît — pas raccourci, disparu. L'application dit au modèle que tout ce qui précède est non vérifié pour ce tour, mais vous devez le savoir aussi : un nombre ou un hachage d'une partie antérieure est une preuve que vous n'avez plus.
 
 ### Origines et remerciements
 

@@ -6380,5 +6380,9 @@ richtig, als sie getippt wurde, und der Test darunter instabil.
 Manifest-Versionen und den Tag — und endet mit Exit-Code 1, wenn ein Test rot ist. Die Regel für
 künftige Abschnitte: Zahlen aus `pnpm status`, nicht aus dem Gedächtnis.
 
+Und eine Lücke in der ehrlichsten Sektion geschlossen: „Known limitations" nannte die Kompression
+nicht. Sie steht jetzt in allen sechs READMEs — dass eine Zusammenfassung nur aus Text entsteht und
+ein Werkzeugergebnis von davor danach weg ist, nicht gekürzt, sondern weg.
+
 `cargo test --lib` **146** / 14 ignoriert (mit `pnpm status` gemessen), `vue-tsc` grün, i18n 556
 Schlüssel, `check:private` sauber.
