@@ -1,6 +1,6 @@
 [package]
 name = "DSIDE"
-version = "0.6.8"
+version = "0.6.9"
 license = "MIT"
 description = "An Agentic DeepSeek IDE"
 authors = ["Ziggy, Modest"]

@@ -6260,3 +6260,8 @@ Schlüssel, `check:private` sauber.
 **Noch offen und die eigentliche Ursache:** das bash-lastige Arbeiten (261 zu 3). Das ist keine
 Grenze, sondern ein Muster, und es gehört in eine eigene Runde — Behauptungen darüber wären heute
 geraten.
+
+### Gebaut, nicht veröffentlicht
+`0.6.9` als AppImage lokal gebaut und gestartet: `data:`-Zeile, Hauptfenster, `X-AppImage-Version`
+= 0.6.9, Update-Check meldet 0.6.8 (richtig, es ist noch nicht veröffentlicht). Kein Tag, kein
+GitHub-Release — das Paket liegt zum Testen bereit.
